@@ -1,0 +1,9 @@
+CREATE DATABASE integration_db
+CREATE TABLE neural_network_mappings (
+    id SERIAL PRIMARY KEY,
+    neural_network_name VARCHAR(255) NOT NULL,  -- — имя нейросети (openai, yandex-gpt).
+    request_type VARCHAR(255) NOT NULL, --— тип запроса (например, transcription, ocr, default).
+    source_attribute VARCHAR(255) NOT NULL, --— имя атрибута в запросе от сервиса заметок.
+    target_attribute VARCHAR(255) NOT NULL -- — имя атрибута в запросе к нейросети.
+);
+

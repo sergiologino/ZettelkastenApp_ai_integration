@@ -22,6 +22,7 @@ extra["springCloudVersion"] = "2024.0.0"
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.postgresql:postgresql:42.6.0")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0")
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
@@ -31,6 +32,10 @@ dependencies {
     implementation("org.apache.tika:tika-core:2.9.0") // Для работы с файлами
     implementation("org.apache.tika:tika-parsers:2.9.0")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0")
+    // https://mvnrepository.com/artifact/org.projectlombok/lombok
+    compileOnly("org.projectlombok:lombok:1.18.34")
+    annotationProcessor("org.projectlombok:lombok:1.18.34")
+
 }
 
 dependencyManagement {
