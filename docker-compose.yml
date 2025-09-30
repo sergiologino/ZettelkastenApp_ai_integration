@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for AI Integration Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-integration-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ai_integration_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ai-integration-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # AI Integration Service
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-integration-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-ai_integration_db}
+      DB_USERNAME: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      
+      # Server
+      SERVER_PORT: 8091
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-min-256-bits-for-production-change-this}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      
+      # AI Settings
+      AI_REQUEST_TIMEOUT: ${AI_REQUEST_TIMEOUT:-60}
+      AI_MAX_RETRIES: ${AI_MAX_RETRIES:-3}
+      AI_ENABLE_FALLBACK: ${AI_ENABLE_FALLBACK:-true}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SHOW_SQL: ${SHOW_SQL:-false}
+    ports:
+      - "${SERVICE_PORT:-8091}:8091"
+    networks:
+      - ai-integration-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  ai-integration-network:
+    driver: bridge
+

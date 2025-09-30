@@ -1,0 +1,17 @@
+# Prometheus configuration file
+
+global:
+  scrape_interval: 15s # Частота сбора метрик
+  evaluation_interval: 15s # Частота оценки правил
+
+# Scrape configurations
+scrape_configs:
+  # AI Integration Service
+  - job_name: 'ai-integration-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['ai-service:8091']
+        labels:
+          application: 'ai-integration-service'
+          environment: 'production'
+
