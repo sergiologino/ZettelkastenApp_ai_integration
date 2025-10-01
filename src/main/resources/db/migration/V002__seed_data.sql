@@ -27,7 +27,7 @@ VALUES (
 
 -- Insert sample neural networks
 
--- OpenAI GPT-4
+-- OpenAI GPT-4o (latest and most powerful)
 INSERT INTO neural_networks (
     id, name, display_name, provider, network_type, api_url, api_key_encrypted,
     model_name, is_active, is_free, priority, timeout_seconds, max_retries,
@@ -35,13 +35,13 @@ INSERT INTO neural_networks (
 )
 VALUES (
     gen_random_uuid(),
-    'openai-gpt4',
-    'OpenAI GPT-4',
+    'openai-gpt4o',
+    'OpenAI GPT-4o',
     'openai',
     'chat',
     'https://api.openai.com/v1',
     '', -- API key will be added by admin
-    'gpt-4',
+    'gpt-4o',
     false, -- Inactive until API key is set
     false,
     10,
@@ -53,7 +53,7 @@ VALUES (
     NOW()
 ) ON CONFLICT (name) DO NOTHING;
 
--- OpenAI GPT-3.5 Turbo (cheaper option)
+-- OpenAI GPT-4o-mini (cheaper and faster option)
 INSERT INTO neural_networks (
     id, name, display_name, provider, network_type, api_url, api_key_encrypted,
     model_name, is_active, is_free, priority, timeout_seconds, max_retries,
@@ -61,7 +61,33 @@ INSERT INTO neural_networks (
 )
 VALUES (
     gen_random_uuid(),
-    'openai-gpt35',
+    'openai-gpt4o-mini',
+    'OpenAI GPT-4o Mini',
+    'openai',
+    'chat',
+    'https://api.openai.com/v1',
+    '',
+    'gpt-4o-mini',
+    false,
+    false,
+    15,
+    60,
+    3,
+    '{}',
+    '{}',
+    NOW(),
+    NOW()
+) ON CONFLICT (name) DO NOTHING;
+
+-- OpenAI GPT-3.5 Turbo (legacy, cheapest option)
+INSERT INTO neural_networks (
+    id, name, display_name, provider, network_type, api_url, api_key_encrypted,
+    model_name, is_active, is_free, priority, timeout_seconds, max_retries,
+    request_mapping, response_mapping, created_at, updated_at
+)
+VALUES (
+    gen_random_uuid(),
+    'openai-gpt35-turbo',
     'OpenAI GPT-3.5 Turbo',
     'openai',
     'chat',
