@@ -35,9 +35,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
         FilterChain filterChain
     ) throws ServletException, IOException {
         
-        // Пропускаем health check и swagger
+        // Пропускаем health check, swagger и auth эндпоинты
         String path = request.getRequestURI();
-        if (path.contains("/actuator/") || path.contains("/swagger") || path.contains("/v3/api-docs")) {
+        if (path.contains("/actuator/") 
+            || path.contains("/swagger") 
+            || path.contains("/v3/api-docs")
+            || path.startsWith("/api/auth/")) {
             filterChain.doFilter(request, response);
             return;
         }

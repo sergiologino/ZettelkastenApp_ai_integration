@@ -47,10 +47,12 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Публичные эндпоинты
-                .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/actuator/health").permitAll()
+                // ✅ Публичные эндпоинты (БЕЗ аутентификации)
+                .requestMatchers("/api/auth/**").permitAll()  // Все auth эндпоинты
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
+                .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
+                .requestMatchers("/error").permitAll()
                 
                 // AI API - требует API-ключ клиентского приложения
                 .requestMatchers("/api/ai/**").hasRole("CLIENT")
@@ -61,7 +63,7 @@ public class SecurityConfig {
                 // Все остальные запросы требуют аутентификации
                 .anyRequest().authenticated()
             )
-            // ✅ Добавляем Rate Limiting фильтр ПЕРВЫМ (проверяет IP перед аутентификацией)
+            // Фильтры: Rate Limit → API Key → JWT
             .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
