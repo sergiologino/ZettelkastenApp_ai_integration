@@ -24,7 +24,7 @@ server:
   
 # JWT Configuration
 jwt:
-  secret: ${JWT_SECRET:your-secret-key-change-in-production-min-256-bits-for-hs256-algorithm}
+  secret: ${JWT_SECRET:dfvts5y76v7srddtdb6756bse45vtd5se5vw3v446ev56b6v4s5c}
   expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
 
 # Encryption Configuration

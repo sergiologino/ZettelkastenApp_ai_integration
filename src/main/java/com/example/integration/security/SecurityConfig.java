@@ -1,5 +1,7 @@
 package com.example.integration.security;
 
+import com.example.integration.repository.AdminUserRepository;
+import com.example.integration.repository.ClientApplicationRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -21,18 +23,20 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
     
-    private final JwtAuthFilter jwtAuthFilter;
-    private final ApiKeyAuthFilter apiKeyAuthFilter;
     private final RateLimitFilter rateLimitFilter;
     
-    public SecurityConfig(
-        JwtAuthFilter jwtAuthFilter, 
-        ApiKeyAuthFilter apiKeyAuthFilter,
-        RateLimitFilter rateLimitFilter
-    ) {
-        this.jwtAuthFilter = jwtAuthFilter;
-        this.apiKeyAuthFilter = apiKeyAuthFilter;
+    public SecurityConfig(RateLimitFilter rateLimitFilter) {
         this.rateLimitFilter = rateLimitFilter;
+    }
+    
+    @Bean
+    public JwtAuthFilter jwtAuthFilter(JwtUtil jwtUtil, AdminUserRepository adminUserRepository) {
+        return new JwtAuthFilter(jwtUtil, adminUserRepository);
+    }
+    
+    @Bean
+    public ApiKeyAuthFilter apiKeyAuthFilter(ClientApplicationRepository clientApplicationRepository) {
+        return new ApiKeyAuthFilter(clientApplicationRepository);
     }
     
     @Bean
@@ -41,7 +45,9 @@ public class SecurityConfig {
     }
     
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, 
+                                           JwtAuthFilter jwtAuthFilter, 
+                                           ApiKeyAuthFilter apiKeyAuthFilter) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
