@@ -4,6 +4,7 @@ import com.example.integration.repository.AdminUserRepository;
 import com.example.integration.repository.ClientApplicationRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -30,12 +31,12 @@ public class SecurityConfig {
     }
     
     @Bean
-    public JwtAuthFilter jwtAuthFilter(JwtUtil jwtUtil, AdminUserRepository adminUserRepository) {
+    public JwtAuthFilter jwtAuthFilter(JwtUtil jwtUtil, @Lazy AdminUserRepository adminUserRepository) {
         return new JwtAuthFilter(jwtUtil, adminUserRepository);
     }
     
     @Bean
-    public ApiKeyAuthFilter apiKeyAuthFilter(ClientApplicationRepository clientApplicationRepository) {
+    public ApiKeyAuthFilter apiKeyAuthFilter(@Lazy ClientApplicationRepository clientApplicationRepository) {
         return new ApiKeyAuthFilter(clientApplicationRepository);
     }
     
