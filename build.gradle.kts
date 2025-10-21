@@ -29,7 +29,7 @@ dependencies {
     implementation("org.postgresql:postgresql:42.6.0")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
     implementation("org.apache.commons:commons-lang3:3.12.0")
     implementation("org.apache.tika:tika-core:2.9.0")

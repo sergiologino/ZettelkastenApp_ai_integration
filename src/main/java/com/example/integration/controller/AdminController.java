@@ -177,9 +177,43 @@ public class AdminController {
     
     @GetMapping("/stats")
     @Operation(summary = "Get service statistics")
-    public ResponseEntity<Object> getStats() {
-        // TODO: реализовать сбор статистики
-        return ResponseEntity.ok("Statistics endpoint - to be implemented");
+    public ResponseEntity<AdminStatsDTO> getStats() {
+        // Сбор общей статистики из логов
+        long totalRequests = requestLogRepository.count();
+        long successfulRequests = requestLogRepository.countByStatus("success");
+        long failedRequests = requestLogRepository.countByStatus("failed");
+        
+        // Подсчет токенов (может быть null, поэтому используем 0 как fallback)
+        Long totalTokens = requestLogRepository.sumTokensUsed();
+        long totalTokensUsed = (totalTokens != null) ? totalTokens : 0L;
+        
+        // Статистика по нейросетям
+        List<RequestLog> allLogs = requestLogRepository.findAll();
+        java.util.Map<String, Long> requestsByNetwork = allLogs.stream()
+            .filter(log -> log.getNeuralNetwork() != null)
+            .collect(java.util.stream.Collectors.groupingBy(
+                log -> log.getNeuralNetwork().getDisplayName(),
+                java.util.stream.Collectors.counting()
+            ));
+        
+        // Статистика по клиентам
+        java.util.Map<String, Long> requestsByClient = allLogs.stream()
+            .filter(log -> log.getClientApp() != null)
+            .collect(java.util.stream.Collectors.groupingBy(
+                log -> log.getClientApp().getName(),
+                java.util.stream.Collectors.counting()
+            ));
+        
+        AdminStatsDTO stats = new AdminStatsDTO(
+            totalRequests,
+            successfulRequests,
+            failedRequests,
+            totalTokensUsed,
+            requestsByNetwork,
+            requestsByClient
+        );
+        
+        return ResponseEntity.ok(stats);
     }
 }
 

@@ -32,5 +32,11 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID> {
     @Query("SELECT COUNT(rl) FROM RequestLog rl WHERE rl.externalUser = :user " +
            "AND rl.createdAt >= :from AND rl.status = 'success'")
     Long countSuccessfulRequestsForUserSince(ExternalUser user, LocalDateTime from);
+    
+    // Statistics methods
+    long countByStatus(String status);
+    
+    @Query("SELECT SUM(rl.tokensUsed) FROM RequestLog rl WHERE rl.tokensUsed IS NOT NULL")
+    Long sumTokensUsed();
 }
 

@@ -6,8 +6,13 @@ import com.example.integration.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * API для аутентификации администраторов
@@ -28,9 +33,18 @@ public class AuthController {
      */
     @PostMapping("/login")
     @Operation(summary = "Admin login", description = "Authenticate administrator and get JWT token")
-    public ResponseEntity<AdminAuthResponse> login(@Valid @RequestBody AdminLoginRequest request) {
-        AdminAuthResponse response = authService.login(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> login(@Valid @RequestBody AdminLoginRequest request) {
+        try {
+            AdminAuthResponse response = authService.login(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Bad Request");
+            error.put("message", e.getMessage());
+            error.put("timestamp", LocalDateTime.now());
+            error.put("status", 400);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
     }
     
     /**
@@ -38,14 +52,22 @@ public class AuthController {
      */
     @PostMapping("/register")
     @Operation(summary = "Register first admin", description = "Register the first administrator (only if no admins exist)")
-    public ResponseEntity<AdminAuthResponse> register(@Valid @RequestBody AdminLoginRequest request) {
-        // TODO: проверить, что это первый админ
-        AdminAuthResponse response = authService.register(
-            request.getUsername(), 
-            request.getUsername() + "@example.com", 
-            request.getPassword()
-        );
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> register(@Valid @RequestBody AdminLoginRequest request) {
+        try {
+            AdminAuthResponse response = authService.register(
+                request.getUsername(), 
+                request.getUsername() + "@example.com", 
+                request.getPassword()
+            );
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Bad Request");
+            error.put("message", e.getMessage());
+            error.put("timestamp", LocalDateTime.now());
+            error.put("status", 400);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
     }
 }
 
