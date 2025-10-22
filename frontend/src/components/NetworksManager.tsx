@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { getNetworks, createNetwork, updateNetwork, deleteNetwork } from '../api';
 import type { NeuralNetwork, NetworkCreateRequest } from '../types';
 
@@ -112,6 +112,176 @@ export const NetworksManager: React.FC = () => {
     }
   };
 
+  // Примеры запросов и ответов для разных провайдеров
+  const getExamples = useMemo(() => {
+    const examples: Record<string, { request: any; response: any }> = {
+      openai: {
+        request: {
+          model: 'gpt-4o',
+          messages: [
+            { role: 'user', content: 'Напиши короткое стихотворение про кота' }
+          ],
+          temperature: 0.7,
+          max_tokens: 150
+        },
+        response: {
+          id: 'chatcmpl-123',
+          object: 'chat.completion',
+          created: 1677652288,
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: 'assistant',
+                content: 'Усатый кот на окне сидит,\nНа улицу мечтательно глядит...'
+              },
+              finish_reason: 'stop'
+            }
+          ],
+          usage: {
+            prompt_tokens: 15,
+            completion_tokens: 25,
+            total_tokens: 40
+          }
+        }
+      },
+      yandex: {
+        request: {
+          modelUri: 'gpt://folder_id/yandexgpt-lite/latest',
+          completionOptions: {
+            stream: false,
+            temperature: 0.6,
+            maxTokens: 2000
+          },
+          messages: [
+            { role: 'user', text: 'Напиши короткое стихотворение про кота' }
+          ]
+        },
+        response: {
+          result: {
+            alternatives: [
+              {
+                message: {
+                  role: 'assistant',
+                  text: 'Усатый кот на окне сидит,\nНа улицу мечтательно глядит...'
+                },
+                status: 'ALTERNATIVE_STATUS_FINAL'
+              }
+            ],
+            usage: {
+              inputTextTokens: 15,
+              completionTokens: 25,
+              totalTokens: 40
+            },
+            modelVersion: '06.12.2023'
+          }
+        }
+      },
+      anthropic: {
+        request: {
+          model: 'claude-3-opus-20240229',
+          max_tokens: 1024,
+          messages: [
+            { role: 'user', content: 'Напиши короткое стихотворение про кота' }
+          ]
+        },
+        response: {
+          id: 'msg_01XFDUDYJgAACzvnptvVoYEL',
+          type: 'message',
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: 'Усатый кот на окне сидит,\nНа улицу мечтательно глядит...'
+            }
+          ],
+          model: 'claude-3-opus-20240229',
+          stop_reason: 'end_turn',
+          usage: {
+            input_tokens: 15,
+            output_tokens: 25
+          }
+        }
+      },
+      mistral: {
+        request: {
+          model: 'mistral-large-latest',
+          messages: [
+            { role: 'user', content: 'Напиши короткое стихотворение про кота' }
+          ],
+          temperature: 0.7,
+          max_tokens: 150
+        },
+        response: {
+          id: 'cmpl-123',
+          object: 'chat.completion',
+          created: 1677652288,
+          model: 'mistral-large-latest',
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: 'assistant',
+                content: 'Усатый кот на окне сидит,\nНа улицу мечтательно глядит...'
+              },
+              finish_reason: 'stop'
+            }
+          ],
+          usage: {
+            prompt_tokens: 15,
+            completion_tokens: 25,
+            total_tokens: 40
+          }
+        }
+      },
+      sber: {
+        request: {
+          model: 'GigaChat',
+          messages: [
+            { role: 'user', content: 'Напиши короткое стихотворение про кота' }
+          ],
+          temperature: 0.7,
+          max_tokens: 512
+        },
+        response: {
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: 'Усатый кот на окне сидит,\nНа улицу мечтательно глядит...'
+              },
+              index: 0,
+              finish_reason: 'stop'
+            }
+          ],
+          created: 1677652288,
+          model: 'GigaChat',
+          usage: {
+            prompt_tokens: 15,
+            completion_tokens: 25,
+            total_tokens: 40
+          }
+        }
+      },
+      whisper: {
+        request: {
+          file: '<audio file binary>',
+          model: 'whisper-1',
+          language: 'ru',
+          response_format: 'json'
+        },
+        response: {
+          text: 'Привет, это пример транскрипции аудио файла.'
+        }
+      }
+    };
+    
+    return examples[formData.provider] || {
+      request: { message: 'Выберите провайдера для отображения примера' },
+      response: { result: 'Пример ответа появится после выбора провайдера' }
+    };
+  }, [formData.provider]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -218,14 +388,19 @@ export const NetworksManager: React.FC = () => {
       {/* Модальное окно редактирования */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4">
+          <div className="flex items-center justify-center min-h-screen px-4 py-6">
             <div className="fixed inset-0 bg-black opacity-30" onClick={() => setIsModalOpen(false)}></div>
-            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">
-                {editingNetwork ? 'Редактировать нейросеть' : 'Создать нейросеть'}
-              </h3>
+            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full flex flex-col max-h-[90vh]">
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 border-b">
+                <h3 className="text-xl font-bold text-gray-900">
+                  {editingNetwork ? 'Редактировать нейросеть' : 'Создать нейросеть'}
+                </h3>
+              </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                <form onSubmit={handleSubmit} className="space-y-4" id="network-form">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -307,7 +482,15 @@ export const NetworksManager: React.FC = () => {
 
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      API Key {editingNetwork ? '(оставьте пустым, чтобы не менять)' : '*'}
+                      API Key {editingNetwork ? '(необязательно)' : '*'}
+                      <span 
+                        className="ml-2 text-blue-500 cursor-help" 
+                        title={editingNetwork 
+                          ? "При редактировании: если оставите поле пустым, API ключ останется прежним.&#10;Введите новый ключ только если хотите его изменить.&#10;&#10;Ключ хранится в БД в зашифрованном виде и не отображается из соображений безопасности."
+                          : "API ключ для доступа к нейросети.&#10;Получите его в личном кабинете провайдера.&#10;&#10;Примеры:&#10;• OpenAI: sk-proj-...&#10;• Yandex: t1.9eu...&#10;• Anthropic: sk-ant-..."}
+                      >
+                        ℹ️
+                      </span>
                     </label>
                     <div className="relative">
                       <input
@@ -316,7 +499,7 @@ export const NetworksManager: React.FC = () => {
                         onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
                         required={!editingNetwork}
-                        placeholder="sk-..."
+                        placeholder={editingNetwork ? "Оставьте пустым, чтобы не менять" : "sk-..."}
                       />
                       <button
                         type="button"
@@ -331,6 +514,12 @@ export const NetworksManager: React.FC = () => {
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Название модели *
+                      <span 
+                        className="ml-2 text-blue-500 cursor-help" 
+                        title="Для Yandex GPT используйте формат: gpt://folder_id/model/latest &#10;где folder_id - это ID вашего каталога в Yandex Cloud&#10;&#10;Пример: gpt://b1g123abc456def789gh/yandexgpt-lite/latest"
+                      >
+                        ℹ️
+                      </span>
                     </label>
                     <input
                       type="text"
@@ -408,24 +597,60 @@ export const NetworksManager: React.FC = () => {
                       <span className="ml-2 text-sm text-gray-700">Бесплатная</span>
                     </label>
                   </div>
-                </div>
 
-                <div className="flex justify-end space-x-3 pt-4 border-t">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                  >
-                    {editingNetwork ? 'Сохранить' : 'Создать'}
-                  </button>
+                  {/* Примеры запроса и ответа */}
+                  <div className="col-span-2 border-t pt-4 mt-2">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                      📋 Примеры структуры запроса и ответа
+                    </h4>
+                    
+                    <div className="space-y-4">
+                      {/* Пример запроса */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Пример запроса к API
+                        </label>
+                        <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs overflow-x-auto max-h-48 overflow-y-auto text-left">
+                          <code className="text-gray-800 font-mono">
+                            {JSON.stringify(getExamples.request, null, 2)}
+                          </code>
+                        </pre>
+                      </div>
+
+                      {/* Пример ответа */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Пример ответа от API
+                        </label>
+                        <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs overflow-x-auto max-h-48 overflow-y-auto text-left">
+                          <code className="text-gray-800 font-mono">
+                            {JSON.stringify(getExamples.response, null, 2)}
+                          </code>
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </form>
+                </form>
+              </div>
+
+              {/* Fixed footer with buttons */}
+              <div className="px-6 py-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 bg-white"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  form="network-form"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  {editingNetwork ? 'Сохранить' : 'Создать'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
