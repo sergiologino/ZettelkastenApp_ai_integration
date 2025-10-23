@@ -101,7 +101,53 @@ public class AiController {
     @GetMapping("/networks/available")
     @Operation(
         summary = "Get available networks", 
-        description = "Получить список доступных нейросетей для клиента с учетом лимитов доступа"
+        description = "Получить список доступных нейросетей для клиента с учетом лимитов доступа. Требуется X-API-Key в заголовке.",
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", 
+                description = "Список доступных нейросетей",
+                content = @io.swagger.v3.oas.annotations.media.Content(
+                    mediaType = "application/json",
+                    examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                        name = "Available networks response",
+                        value = """
+                            [
+                              {
+                                "id": "123e4567-e89b-12d3-a456-426614174000",
+                                "name": "openai-whisper",
+                                "displayName": "OpenAI Whisper",
+                                "provider": "openai",
+                                "networkType": "transcription",
+                                "modelName": "whisper-1",
+                                "isFree": false,
+                                "priority": 10,
+                                "remainingRequestsToday": 100,
+                                "remainingRequestsMonth": 1000,
+                                "hasLimits": true
+                              },
+                              {
+                                "id": "123e4567-e89b-12d3-a456-426614174001",
+                                "name": "yandex-speechkit",
+                                "displayName": "Yandex SpeechKit",
+                                "provider": "yandex",
+                                "networkType": "transcription",
+                                "modelName": "general",
+                                "isFree": true,
+                                "priority": 5,
+                                "remainingRequestsToday": 50,
+                                "remainingRequestsMonth": 500,
+                                "hasLimits": true
+                              }
+                            ]
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401", 
+                description = "Неверный или отсутствующий API ключ"
+            )
+        }
     )
     public ResponseEntity<List<AvailableNetworkDTO>> getAvailableNetworks() {
         // TODO: Добавить авторизацию через X-API-Key
@@ -113,7 +159,56 @@ public class AiController {
      * Проверить доступность конкретной нейросети
      */
     @GetMapping("/networks/{networkId}/available")
-    @Operation(summary = "Check network availability", description = "Проверить доступность конкретной нейросети")
+    @Operation(
+        summary = "Check network availability", 
+        description = "Проверить доступность конкретной нейросети для клиента. Требуется X-API-Key в заголовке.",
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", 
+                description = "Информация о доступности нейросети",
+                content = @io.swagger.v3.oas.annotations.media.Content(
+                    mediaType = "application/json",
+                    examples = {
+                        @io.swagger.v3.oas.annotations.media.ExampleObject(
+                            name = "Network available",
+                            value = """
+                                {
+                                  "networkId": "openai-whisper",
+                                  "available": true,
+                                  "limits": {
+                                    "networkId": "openai-whisper",
+                                    "networkName": "OpenAI Whisper",
+                                    "isFree": false,
+                                    "priority": 10,
+                                    "remainingRequestsToday": 100,
+                                    "remainingRequestsMonth": 1000,
+                                    "hasLimits": true
+                                  }
+                                }
+                                """
+                        ),
+                        @io.swagger.v3.oas.annotations.media.ExampleObject(
+                            name = "Network unavailable",
+                            value = """
+                                {
+                                  "networkId": "inactive-network",
+                                  "available": false
+                                }
+                                """
+                        )
+                    }
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401", 
+                description = "Неверный или отсутствующий API ключ"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404", 
+                description = "Нейросеть не найдена"
+            )
+        }
+    )
     public ResponseEntity<Map<String, Object>> checkNetworkAvailability(@PathVariable String networkId) {
         // TODO: Добавить авторизацию через X-API-Key
         boolean isAvailable = aiOrchestrationService.isNetworkAvailable(networkId);
@@ -135,7 +230,68 @@ public class AiController {
      * Получить лимиты для нейросети
      */
     @GetMapping("/networks/{networkId}/limits")
-    @Operation(summary = "Get network limits", description = "Получить информацию о лимитах для нейросети")
+    @Operation(
+        summary = "Get network limits", 
+        description = "Получить подробную информацию о лимитах и возможностях нейросети. Требуется X-API-Key в заголовке.",
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", 
+                description = "Информация о лимитах нейросети",
+                content = @io.swagger.v3.oas.annotations.media.Content(
+                    mediaType = "application/json",
+                    examples = {
+                        @io.swagger.v3.oas.annotations.media.ExampleObject(
+                            name = "Network limits",
+                            value = """
+                                {
+                                  "networkId": "openai-whisper",
+                                  "networkName": "OpenAI Whisper",
+                                  "isFree": false,
+                                  "priority": 10,
+                                  "remainingRequestsToday": 100,
+                                  "remainingRequestsMonth": 1000,
+                                  "hasLimits": true
+                                }
+                                """
+                        ),
+                        @io.swagger.v3.oas.annotations.media.ExampleObject(
+                            name = "Free network limits",
+                            value = """
+                                {
+                                  "networkId": "yandex-speechkit",
+                                  "networkName": "Yandex SpeechKit",
+                                  "isFree": true,
+                                  "priority": 5,
+                                  "remainingRequestsToday": 50,
+                                  "remainingRequestsMonth": 500,
+                                  "hasLimits": true
+                                }
+                                """
+                        )
+                    }
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401", 
+                description = "Неверный или отсутствующий API ключ"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404", 
+                description = "Нейросеть не найдена",
+                content = @io.swagger.v3.oas.annotations.media.Content(
+                    mediaType = "application/json",
+                    examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                        name = "Network not found",
+                        value = """
+                            {
+                              "error": "Network not found"
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
     public ResponseEntity<Map<String, Object>> getNetworkLimits(@PathVariable String networkId) {
         // TODO: Добавить авторизацию через X-API-Key
         Map<String, Object> limits = aiOrchestrationService.getNetworkLimits(networkId);
@@ -146,7 +302,27 @@ public class AiController {
      * Проверка доступности сервиса
      */
     @GetMapping("/health")
-    @Operation(summary = "Health check", description = "Check if AI service is available")
+    @Operation(
+        summary = "Health check", 
+        description = "Проверить доступность AI Integration Service. Не требует авторизации.",
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", 
+                description = "Сервис доступен",
+                content = @io.swagger.v3.oas.annotations.media.Content(
+                    mediaType = "text/plain",
+                    examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                        name = "Service running",
+                        value = "AI Integration Service is running"
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "500", 
+                description = "Сервис недоступен"
+            )
+        }
+    )
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("AI Integration Service is running");
     }
