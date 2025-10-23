@@ -4,6 +4,7 @@ import com.example.integration.client.BaseNeuralClient;
 import com.example.integration.client.NeuralClientFactory;
 import com.example.integration.dto.AiRequestDTO;
 import com.example.integration.dto.AiResponseDTO;
+import com.example.integration.dto.AvailableNetworkDTO;
 import com.example.integration.model.*;
 import com.example.integration.repository.*;
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -212,6 +214,136 @@ public class AiOrchestrationService {
         
         dto.setUsageLimitInfo(limitInfo);
         
+        return dto;
+    }
+    
+    /**
+     * Получить все доступные нейросети (упрощенная версия)
+     */
+    public List<AvailableNetworkDTO> getAllAvailableNetworks() {
+        // Получаем все активные нейросети
+        List<NeuralNetwork> allNetworks = neuralNetworkRepository.findByIsActiveTrue();
+        
+        return allNetworks.stream()
+            .map(this::convertToAvailableNetworkDTO)
+            .toList();
+    }
+    
+    /**
+     * Получить доступные нейросети для клиента
+     */
+    public List<AvailableNetworkDTO> getAvailableNetworksForClient(ClientApplication clientApp) {
+        // Получаем все активные нейросети
+        List<NeuralNetwork> allNetworks = neuralNetworkRepository.findByIsActiveTrue();
+        
+        return allNetworks.stream()
+            .filter(network -> isNetworkAccessibleToClient(clientApp, network))
+            .map(this::convertToAvailableNetworkDTO)
+            .toList();
+    }
+    
+    /**
+     * Проверить доступность нейросети (упрощенная версия)
+     */
+    public boolean isNetworkAvailable(String networkId) {
+        Optional<NeuralNetwork> networkOpt = neuralNetworkRepository.findByName(networkId);
+        return networkOpt.isPresent() && networkOpt.get().getIsActive();
+    }
+    
+    /**
+     * Проверить доступность нейросети для клиента
+     */
+    public boolean isNetworkAvailableForClient(ClientApplication clientApp, String networkId) {
+        Optional<NeuralNetwork> networkOpt = neuralNetworkRepository.findByName(networkId);
+        if (networkOpt.isEmpty()) {
+            return false;
+        }
+        
+        NeuralNetwork network = networkOpt.get();
+        return isNetworkAccessibleToClient(clientApp, network);
+    }
+    
+    /**
+     * Получить лимиты нейросети (упрощенная версия)
+     */
+    public Map<String, Object> getNetworkLimits(String networkId) {
+        Map<String, Object> limits = new HashMap<>();
+        
+        Optional<NeuralNetwork> networkOpt = neuralNetworkRepository.findByName(networkId);
+        if (networkOpt.isEmpty()) {
+            limits.put("error", "Network not found");
+            return limits;
+        }
+        
+        NeuralNetwork network = networkOpt.get();
+        
+        // Получаем информацию о лимитах
+        limits.put("networkId", networkId);
+        limits.put("networkName", network.getDisplayName());
+        limits.put("isFree", network.getIsFree());
+        limits.put("priority", network.getPriority());
+        
+        // TODO: Добавить реальные лимиты из ClientNetworkAccess
+        limits.put("remainingRequestsToday", null); // Пока не реализовано
+        limits.put("remainingRequestsMonth", null); // Пока не реализовано
+        limits.put("hasLimits", false); // Пока не реализовано
+        
+        return limits;
+    }
+    
+    /**
+     * Получить лимиты нейросети для клиента
+     */
+    public Map<String, Object> getNetworkLimitsForClient(ClientApplication clientApp, String networkId) {
+        Map<String, Object> limits = new HashMap<>();
+        
+        Optional<NeuralNetwork> networkOpt = neuralNetworkRepository.findByName(networkId);
+        if (networkOpt.isEmpty()) {
+            limits.put("error", "Network not found");
+            return limits;
+        }
+        
+        NeuralNetwork network = networkOpt.get();
+        
+        // Получаем информацию о лимитах
+        limits.put("networkId", networkId);
+        limits.put("networkName", network.getDisplayName());
+        limits.put("isFree", network.getIsFree());
+        limits.put("priority", network.getPriority());
+        
+        // TODO: Добавить реальные лимиты из ClientNetworkAccess
+        limits.put("remainingRequestsToday", null); // Пока не реализовано
+        limits.put("remainingRequestsMonth", null); // Пока не реализовано
+        limits.put("hasLimits", false); // Пока не реализовано
+        
+        return limits;
+    }
+    
+    /**
+     * Проверить, доступна ли нейросеть клиенту
+     */
+    private boolean isNetworkAccessibleToClient(ClientApplication clientApp, NeuralNetwork network) {
+        // TODO: Реализовать проверку доступа через ClientNetworkAccess
+        // Пока что возвращаем true для всех активных сетей
+        return network.getIsActive();
+    }
+    
+    /**
+     * Конвертировать NeuralNetwork в AvailableNetworkDTO
+     */
+    private AvailableNetworkDTO convertToAvailableNetworkDTO(NeuralNetwork network) {
+        AvailableNetworkDTO dto = new AvailableNetworkDTO();
+        dto.setId(network.getId().toString());
+        dto.setName(network.getName());
+        dto.setDisplayName(network.getDisplayName());
+        dto.setProvider(network.getProvider());
+        dto.setNetworkType(network.getNetworkType());
+        dto.setModelName(network.getModelName());
+        dto.setIsFree(network.getIsFree());
+        dto.setPriority(network.getPriority());
+        dto.setRemainingRequestsToday(null); // Пока не реализовано
+        dto.setRemainingRequestsMonth(null); // Пока не реализовано
+        dto.setHasLimits(false); // Пока не реализовано
         return dto;
     }
 }
