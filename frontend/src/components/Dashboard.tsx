@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { clearToken } from '../api';
 import { NetworksManager } from './NetworksManager';
 import { ClientsManager } from './ClientsManager';
+import { NetworkAccessManager } from './NetworkAccessManager';
+import { NetworkAccessTests } from './NetworkAccessTests';
 import { LogsViewer } from './LogsViewer';
 import { StatsPanel } from './StatsPanel';
 
-type Tab = 'stats' | 'networks' | 'clients' | 'logs';
+type Tab = 'stats' | 'networks' | 'clients' | 'access' | 'tests' | 'logs';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -23,6 +25,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     { id: 'stats' as Tab, label: '📊 Статистика', icon: '📊' },
     { id: 'networks' as Tab, label: '🧠 Нейросети', icon: '🧠' },
     { id: 'clients' as Tab, label: '🔑 Клиенты', icon: '🔑' },
+    { id: 'access' as Tab, label: '🔗 Доступы', icon: '🔗' },
+    { id: 'tests' as Tab, label: '🧪 Тесты', icon: '🧪' },
     { id: 'logs' as Tab, label: '📋 Логи', icon: '📋' },
   ];
 
@@ -67,6 +71,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         {activeTab === 'stats' && <StatsPanel />}
         {activeTab === 'networks' && <NetworksManager />}
         {activeTab === 'clients' && <ClientsManager />}
+        {activeTab === 'access' && <NetworkAccessManager />}
+        {activeTab === 'tests' && <NetworkAccessTests />}
         {activeTab === 'logs' && <LogsViewer />}
       </main>
     </div>

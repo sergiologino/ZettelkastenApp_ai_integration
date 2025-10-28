@@ -33,6 +33,7 @@ public class AiOrchestrationService {
     private final ExternalUserRepository externalUserRepository;
     private final RequestLogRepository requestLogRepository;
     private final ClientApplicationRepository clientAppRepository;
+    private final NetworkAccessService networkAccessService;
     
     @Value("${ai.enable-fallback:true}")
     private boolean enableFallback;
@@ -43,7 +44,8 @@ public class AiOrchestrationService {
         NeuralNetworkRepository neuralNetworkRepository,
         ExternalUserRepository externalUserRepository,
         RequestLogRepository requestLogRepository,
-        ClientApplicationRepository clientAppRepository
+        ClientApplicationRepository clientAppRepository,
+        NetworkAccessService networkAccessService
     ) {
         this.clientFactory = clientFactory;
         this.rateLimitService = rateLimitService;
@@ -51,6 +53,7 @@ public class AiOrchestrationService {
         this.externalUserRepository = externalUserRepository;
         this.requestLogRepository = requestLogRepository;
         this.clientAppRepository = clientAppRepository;
+        this.networkAccessService = networkAccessService;
     }
     
     /**
@@ -233,13 +236,31 @@ public class AiOrchestrationService {
      * Получить доступные нейросети для клиента
      */
     public List<AvailableNetworkDTO> getAvailableNetworksForClient(ClientApplication clientApp) {
-        // Получаем все активные нейросети
-        List<NeuralNetwork> allNetworks = neuralNetworkRepository.findByIsActiveTrue();
+        log.debug("Получаем доступные нейросети для клиента: {}", clientApp.getName());
         
-        return allNetworks.stream()
-            .filter(network -> isNetworkAccessibleToClient(clientApp, network))
-            .map(this::convertToAvailableNetworkDTO)
-            .toList();
+        // Получаем все доступы клиента через NetworkAccessService
+        return networkAccessService.getAvailableNetworks(clientApp.getId())
+                .stream()
+                .map(access -> {
+                    // Получаем полную информацию о нейросети
+                    NeuralNetwork network = neuralNetworkRepository.findById(access.getNetworkId())
+                            .orElse(null);
+                    
+                    if (network == null || !network.getIsActive()) {
+                        return null; // Пропускаем неактивные нейросети
+                    }
+                    
+                    AvailableNetworkDTO dto = convertToAvailableNetworkDTO(network);
+                    
+                    // Добавляем информацию о лимитах из доступа
+                    dto.setRemainingRequestsToday(access.getDailyRequestLimit());
+                    dto.setRemainingRequestsMonth(access.getMonthlyRequestLimit());
+                    dto.setHasLimits(access.hasDailyLimit() || access.hasMonthlyLimit());
+                    
+                    return dto;
+                })
+                .filter(dto -> dto != null) // Убираем null значения
+                .toList();
     }
     
     /**
@@ -254,8 +275,11 @@ public class AiOrchestrationService {
      * Проверить доступность нейросети для клиента
      */
     public boolean isNetworkAvailableForClient(ClientApplication clientApp, String networkId) {
+        log.debug("Проверяем доступность нейросети {} для клиента {}", networkId, clientApp.getName());
+        
         Optional<NeuralNetwork> networkOpt = neuralNetworkRepository.findByName(networkId);
         if (networkOpt.isEmpty()) {
+            log.warn("Нейросеть не найдена: {}", networkId);
             return false;
         }
         
@@ -305,16 +329,35 @@ public class AiOrchestrationService {
         
         NeuralNetwork network = networkOpt.get();
         
-        // Получаем информацию о лимитах
-        limits.put("networkId", networkId);
-        limits.put("networkName", network.getDisplayName());
-        limits.put("isFree", network.getIsFree());
-        limits.put("priority", network.getPriority());
+        // Проверяем доступ
+        if (!isNetworkAccessibleToClient(clientApp, network)) {
+            limits.put("error", "Network not accessible to client");
+            return limits;
+        }
         
-        // TODO: Добавить реальные лимиты из ClientNetworkAccess
-        limits.put("remainingRequestsToday", null); // Пока не реализовано
-        limits.put("remainingRequestsMonth", null); // Пока не реализовано
-        limits.put("hasLimits", false); // Пока не реализовано
+        // Получаем информацию о лимитах из доступа
+        try {
+            var access = networkAccessService.getClientAccesses(clientApp.getId())
+                    .stream()
+                    .filter(a -> a.getNetworkId().equals(network.getId()))
+                    .findFirst();
+            
+            if (access.isPresent()) {
+                var clientAccess = access.get();
+                limits.put("networkId", networkId);
+                limits.put("networkName", network.getDisplayName());
+                limits.put("isFree", network.getIsFree());
+                limits.put("priority", network.getPriority());
+                limits.put("remainingRequestsToday", clientAccess.getDailyRequestLimit());
+                limits.put("remainingRequestsMonth", clientAccess.getMonthlyRequestLimit());
+                limits.put("hasLimits", clientAccess.hasDailyLimit() || clientAccess.hasMonthlyLimit());
+            } else {
+                limits.put("error", "Access not found");
+            }
+        } catch (Exception e) {
+            log.error("Ошибка получения лимитов для клиента", e);
+            limits.put("error", "Failed to get limits");
+        }
         
         return limits;
     }
@@ -323,9 +366,8 @@ public class AiOrchestrationService {
      * Проверить, доступна ли нейросеть клиенту
      */
     private boolean isNetworkAccessibleToClient(ClientApplication clientApp, NeuralNetwork network) {
-        // TODO: Реализовать проверку доступа через ClientNetworkAccess
-        // Пока что возвращаем true для всех активных сетей
-        return network.getIsActive();
+        // Проверяем доступ через NetworkAccessService
+        return networkAccessService.isNetworkAvailable(clientApp.getId(), network.getId());
     }
     
     /**
