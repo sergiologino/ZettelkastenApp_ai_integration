@@ -68,11 +68,20 @@ public class ClientManagementService {
      */
     @Transactional
     public void deactivateClient(UUID id) {
+        log.info("🔍 [Admin] Попытка деактивации клиента с ID: {}", id);
+        
         ClientApplication client = clientAppRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Client not found"));
+            .orElseThrow(() -> {
+                log.error("❌ [Admin] Клиент с ID {} не найден", id);
+                return new IllegalArgumentException("Client not found");
+            });
+        
+        log.info("📋 [Admin] Найден клиент: {} (активен: {})", client.getName(), client.getIsActive());
         
         client.setIsActive(false);
-        clientAppRepository.save(client);
+        ClientApplication savedClient = clientAppRepository.save(client);
+        
+        log.info("✅ [Admin] Клиент {} успешно деактивирован (ID: {})", savedClient.getName(), savedClient.getId());
     }
     
     /**

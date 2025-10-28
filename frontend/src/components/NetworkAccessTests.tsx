@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { fetchApi } from '../api';
 
 interface TestResult {
   name: string;
@@ -40,9 +41,9 @@ export const NetworkAccessTests: React.FC = () => {
     addResult({ name: 'Получение всех доступов', status: 'loading', message: 'Загружаем все доступы...' });
     
     try {
-      const response = await fetch('/api/admin/access', {
+      const response = await fetch('http://localhost:8091/api/admin/access', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}`,
         },
       });
       
@@ -77,9 +78,9 @@ export const NetworkAccessTests: React.FC = () => {
     addResult({ name: 'Статистика доступов', status: 'loading', message: 'Загружаем статистику...' });
     
     try {
-      const response = await fetch('/api/admin/access/stats', {
+      const response = await fetch('http://localhost:8091/api/admin/access/stats', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}`,
         },
       });
       
@@ -116,13 +117,33 @@ export const NetworkAccessTests: React.FC = () => {
     try {
       // Сначала получаем список клиентов и нейросетей
       const [clientsResponse, networksResponse] = await Promise.all([
-        fetch('/api/admin/clients', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        fetch('http://localhost:8091/api/admin/clients', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}` },
         }),
-        fetch('/api/admin/networks', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        fetch('http://localhost:8091/api/admin/networks', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}` },
         }),
       ]);
+
+      if (!clientsResponse.ok) {
+        addResult({ 
+          name: 'Предоставление доступа', 
+          status: 'error', 
+          message: `❌ Ошибка получения клиентов: ${clientsResponse.status}`,
+          data: await clientsResponse.text()
+        });
+        return;
+      }
+
+      if (!networksResponse.ok) {
+        addResult({ 
+          name: 'Предоставление доступа', 
+          status: 'error', 
+          message: `❌ Ошибка получения нейросетей: ${networksResponse.status}`,
+          data: await networksResponse.text()
+        });
+        return;
+      }
 
       const clients = await clientsResponse.json();
       const networks = await networksResponse.json();
@@ -145,11 +166,11 @@ export const NetworkAccessTests: React.FC = () => {
         monthlyRequestLimit: 1000,
       };
 
-      const response = await fetch('/api/admin/access', {
+      const response = await fetch('http://localhost:8091/api/admin/access', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}`,
         },
         body: JSON.stringify(testData),
       });
@@ -186,9 +207,9 @@ export const NetworkAccessTests: React.FC = () => {
     
     try {
       // Сначала получаем список доступов
-      const response = await fetch('/api/admin/access', {
+      const response = await fetch('http://localhost:8091/api/admin/access', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}`,
         },
       });
       
@@ -206,10 +227,10 @@ export const NetworkAccessTests: React.FC = () => {
 
       // Пытаемся отозвать первый доступ
       const accessToRevoke = accesses[0];
-      const revokeResponse = await fetch(`/api/admin/access/${accessToRevoke.id}`, {
+      const revokeResponse = await fetch(`http://localhost:8091/api/admin/access/${accessToRevoke.id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}`,
         },
       });
 
@@ -244,9 +265,19 @@ export const NetworkAccessTests: React.FC = () => {
     
     try {
       // Сначала получаем список клиентов
-      const clientsResponse = await fetch('/api/admin/clients', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      const clientsResponse = await fetch('http://localhost:8091/api/admin/clients', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}` },
       });
+      
+      if (!clientsResponse.ok) {
+        addResult({ 
+          name: 'Доступы клиента', 
+          status: 'error', 
+          message: `❌ Ошибка получения клиентов: ${clientsResponse.status}`,
+          data: await clientsResponse.text()
+        });
+        return;
+      }
       
       const clients = await clientsResponse.json();
       
@@ -261,9 +292,9 @@ export const NetworkAccessTests: React.FC = () => {
       }
 
       // Получаем доступы первого клиента
-      const response = await fetch(`/api/admin/access/client/${clients[0].id}`, {
+      const response = await fetch(`http://localhost:8091/api/admin/access/client/${clients[0].id}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}`,
         },
       });
       
@@ -299,9 +330,19 @@ export const NetworkAccessTests: React.FC = () => {
     
     try {
       // Сначала получаем список нейросетей
-      const networksResponse = await fetch('/api/admin/networks', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      const networksResponse = await fetch('http://localhost:8091/api/admin/networks', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}` },
       });
+      
+      if (!networksResponse.ok) {
+        addResult({ 
+          name: 'Доступы нейросети', 
+          status: 'error', 
+          message: `❌ Ошибка получения нейросетей: ${networksResponse.status}`,
+          data: await networksResponse.text()
+        });
+        return;
+      }
       
       const networks = await networksResponse.json();
       
@@ -316,9 +357,9 @@ export const NetworkAccessTests: React.FC = () => {
       }
 
       // Получаем доступы первой нейросети
-      const response = await fetch(`/api/admin/access/network/${networks[0].id}`, {
+      const response = await fetch(`http://localhost:8091/api/admin/access/network/${networks[0].id}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('ai_admin_token')}`,
         },
       });
       
