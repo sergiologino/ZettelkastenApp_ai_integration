@@ -28,11 +28,11 @@ public class ClientManagementService {
     }
     
     /**
-     * Получить все клиентские приложения
+     * Получить все неудаленные клиентские приложения
      */
     @Transactional(readOnly = true)
     public List<ClientAppDTO> getAllClients() {
-        return clientAppRepository.findAll().stream()
+        return clientAppRepository.findByDeletedFalse().stream()
             .map(this::toDTO)
             .collect(Collectors.toList());
     }
@@ -68,6 +68,32 @@ public class ClientManagementService {
     }
     
     /**
+     * Мягкое удаление клиентского приложения
+     */
+    @Transactional
+    public void deleteClient(UUID id) {
+        log.info("🗑️ [Admin] Попытка удаления клиента с ID: {}", id);
+        
+        ClientApplication client = clientAppRepository.findById(id)
+            .orElseThrow(() -> {
+                log.error("❌ [Admin] Клиент с ID {} не найден", id);
+                return new IllegalArgumentException("Client not found");
+            });
+        
+        log.info("📋 [Admin] Найден клиент: {} (удален: {})", client.getName(), client.getDeleted());
+        
+        if (client.getDeleted()) {
+            log.warn("⚠️ [Admin] Клиент {} уже удален", client.getName());
+            return;
+        }
+        
+        client.setDeleted(true);
+        ClientApplication savedClient = clientAppRepository.save(client);
+        
+        log.info("✅ [Admin] Клиент {} успешно удален (ID: {})", savedClient.getName(), savedClient.getId());
+    }
+    
+    /**
      * Деактивировать клиентское приложение
      */
     @Transactional
@@ -82,10 +108,41 @@ public class ClientManagementService {
         
         log.info("📋 [Admin] Найден клиент: {} (активен: {})", client.getName(), client.getIsActive());
         
+        if (!client.getIsActive()) {
+            log.warn("⚠️ [Admin] Клиент {} уже деактивирован", client.getName());
+            return;
+        }
+        
         client.setIsActive(false);
         ClientApplication savedClient = clientAppRepository.save(client);
         
         log.info("✅ [Admin] Клиент {} успешно деактивирован (ID: {})", savedClient.getName(), savedClient.getId());
+    }
+    
+    /**
+     * Активировать клиентское приложение
+     */
+    @Transactional
+    public void activateClient(UUID id) {
+        log.info("🔍 [Admin] Попытка активации клиента с ID: {}", id);
+        
+        ClientApplication client = clientAppRepository.findById(id)
+            .orElseThrow(() -> {
+                log.error("❌ [Admin] Клиент с ID {} не найден", id);
+                return new IllegalArgumentException("Client not found");
+            });
+        
+        log.info("📋 [Admin] Найден клиент: {} (активен: {})", client.getName(), client.getIsActive());
+        
+        if (client.getIsActive()) {
+            log.warn("⚠️ [Admin] Клиент {} уже активен", client.getName());
+            return;
+        }
+        
+        client.setIsActive(true);
+        ClientApplication savedClient = clientAppRepository.save(client);
+        
+        log.info("✅ [Admin] Клиент {} успешно активирован (ID: {})", savedClient.getName(), savedClient.getId());
     }
     
     /**

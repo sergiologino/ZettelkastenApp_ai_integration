@@ -142,19 +142,19 @@ public class AdminController {
     }
     
     @DeleteMapping("/clients/{id}")
-    @Operation(summary = "Deactivate client application")
-    public ResponseEntity<Void> deactivateClient(@PathVariable UUID id) {
-        log.info("🗑️ [Admin] Запрос на деактивацию клиента с ID: {}", id);
+    @Operation(summary = "Delete client application")
+    public ResponseEntity<Void> deleteClient(@PathVariable UUID id) {
+        log.info("🗑️ [Admin] Запрос на удаление клиента с ID: {}", id);
         
         try {
-            clientService.deactivateClient(id);
-            log.info("✅ [Admin] Клиент с ID {} успешно деактивирован", id);
+            clientService.deleteClient(id);
+            log.info("✅ [Admin] Клиент с ID {} успешно удален", id);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            log.error("❌ [Admin] Ошибка деактивации клиента {}: {}", id, e.getMessage());
+            log.error("❌ [Admin] Ошибка удаления клиента {}: {}", id, e.getMessage());
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            log.error("❌ [Admin] Неожиданная ошибка при деактивации клиента {}: {}", id, e.getMessage(), e);
+            log.error("❌ [Admin] Неожиданная ошибка при удалении клиента {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
