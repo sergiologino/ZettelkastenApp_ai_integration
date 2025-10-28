@@ -72,13 +72,13 @@ export const ClientsManager: React.FC = () => {
     if (!confirm(`Удалить клиента "${name}"?`)) return;
     
     try {
-      console.log(`Попытка удаления клиента ${name} с ID: ${id}`);
+      console.log(`🔍 [Frontend] Попытка удаления клиента ${name} с ID: ${id}`);
       await deleteClient(id);
-      console.log(`Клиент ${name} успешно удален`);
+      console.log(`✅ [Frontend] Клиент ${name} успешно удален`);
       loadClients();
       alert(`Клиент "${name}" успешно удален!`);
     } catch (err: any) {
-      console.error('Ошибка удаления клиента:', err);
+      console.error('❌ [Frontend] Ошибка удаления клиента:', err);
       alert('Ошибка удаления: ' + err.message);
     }
   };

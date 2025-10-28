@@ -41,10 +41,14 @@ export async function fetchApi<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  console.log(`🔍 [API] Отправляем ${options.method || 'GET'} запрос к ${endpoint}`);
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
   });
+
+  console.log(`📊 [API] Получен ответ: ${response.status} ${response.statusText}`);
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
@@ -52,15 +56,19 @@ export async function fetchApi<T>(
       throw new Error('Не авторизован. Войдите снова.');
     }
     const errorText = await response.text();
+    console.error(`❌ [API] Ошибка ${response.status}: ${errorText}`);
     throw new Error(errorText || `HTTP ${response.status}`);
   }
 
   // Если ответ пустой (204 No Content)
   if (response.status === 204 || response.headers.get('Content-Length') === '0') {
+    console.log(`✅ [API] Успешный ответ без содержимого (${response.status})`);
     return {} as T;
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log(`✅ [API] Успешный ответ с данными:`, result);
+  return result;
 }
 
 // ==================== AUTH ====================
