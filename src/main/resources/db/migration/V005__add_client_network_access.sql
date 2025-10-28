@@ -1,4 +1,4 @@
--- Migration: Add client_network_access table
+-- Migration: Add client_network_access table or update existing one
 -- Creates many-to-many relationship between clients and neural networks with access limits
 
 -- Create the client_network_access table (only if it doesn't exist)
@@ -6,8 +6,6 @@ CREATE TABLE IF NOT EXISTS client_network_access (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_application_id UUID NOT NULL,
     neural_network_id UUID NOT NULL,
-    daily_request_limit INTEGER,
-    monthly_request_limit INTEGER,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
     
@@ -15,6 +13,24 @@ CREATE TABLE IF NOT EXISTS client_network_access (
     CONSTRAINT fk_neural_network FOREIGN KEY (neural_network_id) REFERENCES neural_networks(id) ON DELETE CASCADE,
     CONSTRAINT uk_client_network UNIQUE (client_application_id, neural_network_id)
 );
+
+-- Add missing columns if they don't exist
+DO $$ 
+BEGIN
+    -- Add daily_request_limit column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'client_network_access' 
+                   AND column_name = 'daily_request_limit') THEN
+        ALTER TABLE client_network_access ADD COLUMN daily_request_limit INTEGER;
+    END IF;
+    
+    -- Add monthly_request_limit column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'client_network_access' 
+                   AND column_name = 'monthly_request_limit') THEN
+        ALTER TABLE client_network_access ADD COLUMN monthly_request_limit INTEGER;
+    END IF;
+END $$;
 
 -- Create indexes for better performance (only if they don't exist)
 CREATE INDEX IF NOT EXISTS idx_client_network_access_client_id ON client_network_access (client_application_id);
