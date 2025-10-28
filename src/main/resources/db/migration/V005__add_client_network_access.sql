@@ -1,8 +1,8 @@
 -- Migration: Add client_network_access table
 -- Creates many-to-many relationship between clients and neural networks with access limits
 
--- Create the client_network_access table
-CREATE TABLE client_network_access (
+-- Create the client_network_access table (only if it doesn't exist)
+CREATE TABLE IF NOT EXISTS client_network_access (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_application_id UUID NOT NULL,
     neural_network_id UUID NOT NULL,
@@ -16,11 +16,11 @@ CREATE TABLE client_network_access (
     CONSTRAINT uk_client_network UNIQUE (client_application_id, neural_network_id)
 );
 
--- Create indexes for better performance
-CREATE INDEX idx_client_network_access_client_id ON client_network_access (client_application_id);
-CREATE INDEX idx_client_network_access_network_id ON client_network_access (neural_network_id);
+-- Create indexes for better performance (only if they don't exist)
+CREATE INDEX IF NOT EXISTS idx_client_network_access_client_id ON client_network_access (client_application_id);
+CREATE INDEX IF NOT EXISTS idx_client_network_access_network_id ON client_network_access (neural_network_id);
 
--- Create trigger for automatic updated_at update
+-- Create trigger for automatic updated_at update (only if it doesn't exist)
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -29,6 +29,8 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Drop trigger if exists and recreate it
+DROP TRIGGER IF EXISTS update_client_network_access_updated_at ON client_network_access;
 CREATE TRIGGER update_client_network_access_updated_at
 BEFORE UPDATE ON client_network_access
 FOR EACH ROW
