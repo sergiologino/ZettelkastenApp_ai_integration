@@ -1,35 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getClients } from '../api';
-import { getNetworks } from '../api';
-import type { ClientApplication, NeuralNetwork } from '../types';
-
-// Типы для управления доступом
-interface ClientNetworkAccess {
-  id: string;
-  clientId: string;
-  clientName: string;
-  networkId: string;
-  networkDisplayName: string;
-  networkProvider: string;
-  networkType: string;
-  dailyRequestLimit: number | null;
-  monthlyRequestLimit: number | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface GrantAccessRequest {
-  clientId: string;
-  networkId: string;
-  dailyRequestLimit: number | null;
-  monthlyRequestLimit: number | null;
-}
-
-interface AccessStats {
-  totalAccesses: number;
-  accessesWithLimits: number;
-  unlimitedAccesses: number;
-}
+import { getClients, getNetworks, fetchApi } from '../api';
+import type { ClientApplication, NeuralNetwork, ClientNetworkAccess, AccessStats, GrantAccessRequest } from '../types';
 
 export const NetworkAccessManager: React.FC = () => {
   const [accesses, setAccesses] = useState<ClientNetworkAccess[]>([]);
@@ -44,8 +15,8 @@ export const NetworkAccessManager: React.FC = () => {
   const [formData, setFormData] = useState<GrantAccessRequest>({
     clientId: '',
     networkId: '',
-    dailyRequestLimit: null,
-    monthlyRequestLimit: null,
+    dailyRequestLimit: undefined,
+    monthlyRequestLimit: undefined,
   });
 
   useEffect(() => {
@@ -75,49 +46,23 @@ export const NetworkAccessManager: React.FC = () => {
   };
 
   const fetchAccesses = async (): Promise<ClientNetworkAccess[]> => {
-    const response = await fetch('/api/admin/access', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Ошибка загрузки доступов: ${response.status}`);
-    }
-    
-    return response.json();
+    return fetchApi<ClientNetworkAccess[]>('/api/admin/access');
   };
 
   const fetchStats = async (): Promise<AccessStats> => {
-    const response = await fetch('/api/admin/access/stats', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Ошибка загрузки статистики: ${response.status}`);
-    }
-    
-    return response.json();
+    return fetchApi<AccessStats>('/api/admin/access/stats');
   };
 
   const handleGrantAccess = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      const response = await fetch('/api/admin/access', {
+      const response = await fetchApi('/api/admin/access', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) {
-        throw new Error(`Ошибка предоставления доступа: ${response.status}`);
-      }
+      // fetchApi уже обрабатывает ошибки
 
       setIsModalOpen(false);
       loadData();
@@ -130,16 +75,9 @@ export const NetworkAccessManager: React.FC = () => {
     if (!confirm('Отозвать доступ? Это действие нельзя отменить.')) return;
     
     try {
-      const response = await fetch(`/api/admin/access/${accessId}`, {
+      await fetchApi(`/api/admin/access/${accessId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
       });
-
-      if (!response.ok) {
-        throw new Error(`Ошибка отзыва доступа: ${response.status}`);
-      }
 
       loadData();
     } catch (err: any) {

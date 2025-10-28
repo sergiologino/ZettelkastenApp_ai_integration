@@ -433,9 +433,9 @@ export const NetworkAccessTests: React.FC = () => {
           <li><strong>Получение всех доступов</strong> - проверяет GET /api/admin/access</li>
           <li><strong>Статистика доступов</strong> - проверяет GET /api/admin/access/stats</li>
           <li><strong>Предоставление доступа</strong> - проверяет POST /api/admin/access</li>
-          <li><strong>Отзыв доступа</strong> - проверяет DELETE /api/admin/access/{id}</li>
-          <li><strong>Доступы клиента</strong> - проверяет GET /api/admin/access/client/{id}</li>
-          <li><strong>Доступы нейросети</strong> - проверяет GET /api/admin/access/network/{id}</li>
+          <li><strong>Отзыв доступа</strong> - проверяет DELETE /api/admin/access/&#123;id&#125;</li>
+          <li><strong>Доступы клиента</strong> - проверяет GET /api/admin/access/client/&#123;id&#125;</li>
+          <li><strong>Доступы нейросети</strong> - проверяет GET /api/admin/access/network/&#123;id&#125;</li>
         </ul>
       </div>
     </div>

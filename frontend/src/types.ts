@@ -86,6 +86,31 @@ export interface UsageStats {
   requestsByClient: Record<string, number>;
 }
 
+export interface ClientNetworkAccess {
+  id: string;
+  clientId: string;
+  clientName: string;
+  networkId: string;
+  networkDisplayName: string;
+  dailyRequestLimit?: number;
+  monthlyRequestLimit?: number;
+}
+
+export interface AccessStats {
+  totalAccesses: number;
+  accessesWithLimits: number;
+  unlimitedAccesses: number;
+  clientsWithAccess: number;
+  networksWithAccess: number;
+}
+
+export interface GrantAccessRequest {
+  clientId: string;
+  networkId: string;
+  dailyRequestLimit?: number;
+  monthlyRequestLimit?: number;
+}
+
 export interface NetworkLimit {
   id: string;
   neuralNetworkId: string;
