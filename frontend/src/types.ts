@@ -92,16 +92,18 @@ export interface ClientNetworkAccess {
   clientName: string;
   networkId: string;
   networkDisplayName: string;
+  networkProvider: string;
+  networkType: string;
   dailyRequestLimit?: number;
   monthlyRequestLimit?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AccessStats {
   totalAccesses: number;
   accessesWithLimits: number;
   unlimitedAccesses: number;
-  clientsWithAccess: number;
-  networksWithAccess: number;
 }
 
 export interface GrantAccessRequest {
