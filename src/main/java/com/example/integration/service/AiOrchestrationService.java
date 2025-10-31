@@ -236,19 +236,27 @@ public class AiOrchestrationService {
      * Получить доступные нейросети для клиента
      */
     public List<AvailableNetworkDTO> getAvailableNetworksForClient(ClientApplication clientApp) {
-        log.debug("Получаем доступные нейросети для клиента: {}", clientApp.getName());
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AiOrchestrationService.class);
+        log.info("🔍 [AiOrchestrationService] Получаем доступные нейросети для клиента: {} (ID: {})", 
+            clientApp.getName(), clientApp.getId());
         
         // Получаем все доступы клиента через NetworkAccessService
-        return networkAccessService.getAvailableNetworks(clientApp.getId())
-                .stream()
+        var accesses = networkAccessService.getAvailableNetworks(clientApp.getId());
+        log.info("🔍 [AiOrchestrationService] Найдено {} доступов для клиента", accesses.size());
+        
+        List<AvailableNetworkDTO> networks = accesses.stream()
                 .map(access -> {
                     // Получаем полную информацию о нейросети
                     NeuralNetwork network = neuralNetworkRepository.findById(access.getNetworkId())
                             .orElse(null);
                     
                     if (network == null || !network.getIsActive()) {
+                        log.debug("⚠️ [AiOrchestrationService] Нейросеть {} не найдена или неактивна", access.getNetworkId());
                         return null; // Пропускаем неактивные нейросети
                     }
+                    
+                    log.debug("✅ [AiOrchestrationService] Найдена нейросеть: {} (тип: {})", 
+                        network.getDisplayName(), network.getNetworkType());
                     
                     AvailableNetworkDTO dto = convertToAvailableNetworkDTO(network);
                     
@@ -261,6 +269,15 @@ public class AiOrchestrationService {
                 })
                 .filter(dto -> dto != null) // Убираем null значения
                 .toList();
+        
+        log.info("✅ [AiOrchestrationService] Возвращаем {} доступных нейросетей для клиента {}", 
+            networks.size(), clientApp.getName());
+        networks.forEach(network -> {
+            log.debug("  - {} (тип: {}, приоритет: {})", 
+                network.getDisplayName(), network.getNetworkType(), network.getPriority());
+        });
+        
+        return networks;
     }
     
     /**

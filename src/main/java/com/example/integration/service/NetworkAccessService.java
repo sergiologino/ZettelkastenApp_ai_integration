@@ -136,15 +136,28 @@ public class NetworkAccessService {
      */
     @Transactional(readOnly = true)
     public List<ClientNetworkAccessDTO> getClientAccesses(UUID clientId) {
-        log.debug("Получаем доступы для клиента: {}", clientId);
+        log.info("🔍 [NetworkAccessService] Получаем все доступы для клиента: {}", clientId);
         
         ClientApplication client = clientApplicationRepository.findById(clientId)
-                .orElseThrow(() -> new IllegalArgumentException("Клиент не найден: " + clientId));
+                .orElseThrow(() -> {
+                    log.error("❌ [NetworkAccessService] Клиент не найден: {}", clientId);
+                    return new IllegalArgumentException("Клиент не найден: " + clientId);
+                });
+        
+        log.info("✅ [NetworkAccessService] Клиент найден: {} (ID: {})", client.getName(), client.getId());
 
-        return clientNetworkAccessRepository.findByClientApplicationOrderByNeuralNetworkDisplayNameAsc(client)
+        List<ClientNetworkAccessDTO> accesses = clientNetworkAccessRepository.findByClientApplicationOrderByNeuralNetworkDisplayNameAsc(client)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
+        
+        log.info("📋 [NetworkAccessService] Найдено {} доступов в БД для клиента {}", accesses.size(), client.getName());
+        accesses.forEach(access -> {
+            log.debug("  - Доступ к нейросети ID: {}, DisplayName: {}", 
+                access.getNetworkId(), access.getNetworkDisplayName());
+        });
+        
+        return accesses;
     }
 
     /**
@@ -178,9 +191,15 @@ public class NetworkAccessService {
      */
     @Transactional(readOnly = true)
     public List<ClientNetworkAccessDTO> getAvailableNetworks(UUID clientId) {
-        log.debug("Получаем доступные нейросети для клиента: {}", clientId);
+        log.info("🔍 [NetworkAccessService] Получаем доступные нейросети для клиента: {}", clientId);
         
-        return getClientAccesses(clientId);
+        List<ClientNetworkAccessDTO> accesses = getClientAccesses(clientId);
+        log.info("✅ [NetworkAccessService] Найдено {} доступов для клиента {}", accesses.size(), clientId);
+        accesses.forEach(access -> {
+            log.debug("  - Нейросеть ID: {}, DisplayName: {}", access.getNetworkId(), access.getNetworkDisplayName());
+        });
+        
+        return accesses;
     }
 
     /**
