@@ -149,9 +149,17 @@ public class AiController {
             )
         }
     )
-    public ResponseEntity<List<AvailableNetworkDTO>> getAvailableNetworks() {
-        // TODO: Добавить авторизацию через X-API-Key
-        List<AvailableNetworkDTO> networks = aiOrchestrationService.getAllAvailableNetworks();
+    public ResponseEntity<List<AvailableNetworkDTO>> getAvailableNetworks(Authentication authentication) {
+        // ✅ ИСПРАВЛЕНИЕ: Получаем клиента из SecurityContext (установлен ApiKeyAuthFilter)
+        if (authentication == null || !(authentication.getPrincipal() instanceof ClientApplication)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                .build();
+        }
+        
+        ClientApplication clientApp = (ClientApplication) authentication.getPrincipal();
+        
+        // ✅ Используем метод, который возвращает только доступные сети для этого клиента
+        List<AvailableNetworkDTO> networks = aiOrchestrationService.getAvailableNetworksForClient(clientApp);
         return ResponseEntity.ok(networks);
     }
     
