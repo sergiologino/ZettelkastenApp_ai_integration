@@ -150,16 +150,28 @@ public class AiController {
         }
     )
     public ResponseEntity<List<AvailableNetworkDTO>> getAvailableNetworks(Authentication authentication) {
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AiController.class);
+        log.info("🔵 [AiController] ===== ЗАПРОС /api/ai/networks/available =====");
+        
         // ✅ ИСПРАВЛЕНИЕ: Получаем клиента из SecurityContext (установлен ApiKeyAuthFilter)
         if (authentication == null || !(authentication.getPrincipal() instanceof ClientApplication)) {
+            log.warn("⚠️ [AiController] Аутентификация не пройдена или клиент не найден");
+            log.warn("   Authentication: {}", authentication != null ? "есть" : "null");
+            if (authentication != null && authentication.getPrincipal() != null) {
+                log.warn("   Principal type: {}", authentication.getPrincipal().getClass().getName());
+            }
             return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
                 .build();
         }
         
         ClientApplication clientApp = (ClientApplication) authentication.getPrincipal();
+        log.info("✅ [AiController] Клиент найден: {} (ID: {})", clientApp.getName(), clientApp.getId());
         
         // ✅ Используем метод, который возвращает только доступные сети для этого клиента
+        log.info("🔍 [AiController] Вызываем getAvailableNetworksForClient...");
         List<AvailableNetworkDTO> networks = aiOrchestrationService.getAvailableNetworksForClient(clientApp);
+        log.info("✅ [AiController] Получено {} доступных нейросетей для клиента {}", networks.size(), clientApp.getName());
+        
         return ResponseEntity.ok(networks);
     }
     
