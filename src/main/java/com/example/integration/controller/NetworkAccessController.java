@@ -85,6 +85,34 @@ public class NetworkAccessController {
     }
 
     /**
+     * Предоставить доступ клиенту КО ВСЕМ активным нейросетям
+     */
+    @PostMapping("/grant-all/{clientId}")
+    @Operation(summary = "Предоставить доступ ко всем сетям", description = "Автоматически предоставить доступ клиенту ко всем активным нейросетям")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Доступ предоставлен успешно"),
+            @ApiResponse(responseCode = "400", description = "Неверные данные запроса"),
+            @ApiResponse(responseCode = "401", description = "Неавторизован"),
+            @ApiResponse(responseCode = "403", description = "Нет прав доступа")
+    })
+    public ResponseEntity<?> grantAccessToAllNetworks(@PathVariable UUID clientId) {
+        log.info("🔗 [Admin] ===== Предоставление доступа клиенту {} ко ВСЕМ активным нейросетям =====", clientId);
+        
+        try {
+            java.util.Map<String, Object> result = networkAccessService.grantAccessToAllNetworks(clientId);
+            log.info("✅ [Admin] Доступ предоставлен к {} нейросетям", result.get("granted"));
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            log.warn("⚠️ [Admin] Ошибка: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("❌ [Admin] Ошибка предоставления доступа", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", "Ошибка предоставления доступа: " + e.getMessage()));
+        }
+    }
+    
+    /**
      * Предоставить доступ клиенту к нейросети
      */
     @PostMapping

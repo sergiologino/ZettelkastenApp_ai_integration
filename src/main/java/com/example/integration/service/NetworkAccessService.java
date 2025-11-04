@@ -236,6 +236,86 @@ public class NetworkAccessService {
     }
 
     /**
+     * Предоставить доступ клиенту КО ВСЕМ активным нейросетям
+     */
+    public java.util.Map<String, Object> grantAccessToAllNetworks(UUID clientId) {
+        log.info("🔗 [NetworkAccessService] ===== Начало предоставления доступа ко всем сетям =====");
+        log.info("   ClientId: {}", clientId);
+        
+        // Проверяем существование клиента
+        ClientApplication client = clientApplicationRepository.findById(clientId)
+                .orElseThrow(() -> {
+                    log.error("❌ Клиент не найден: {}", clientId);
+                    return new IllegalArgumentException("Клиент не найден: " + clientId);
+                });
+        
+        log.info("✅ Клиент найден: {} (активен: {})", client.getName(), client.getIsActive());
+        
+        // Получаем все активные нейросети
+        List<NeuralNetwork> activeNetworks = neuralNetworkRepository.findByIsActiveTrue();
+        log.info("📡 Найдено активных нейросетей: {}", activeNetworks.size());
+        
+        if (activeNetworks.isEmpty()) {
+            log.warn("⚠️ Нет активных нейросетей для предоставления доступа");
+            return java.util.Map.of(
+                "message", "Нет активных нейросетей",
+                "granted", 0,
+                "skipped", 0,
+                "total", 0
+            );
+        }
+        
+        int granted = 0;
+        int skipped = 0;
+        java.util.List<String> grantedNetworks = new java.util.ArrayList<>();
+        java.util.List<String> skippedNetworks = new java.util.ArrayList<>();
+        
+        // Предоставляем доступ ко всем активным нейросетям
+        for (NeuralNetwork network : activeNetworks) {
+            try {
+                // Проверяем, не существует ли уже доступ
+                Optional<ClientNetworkAccess> existingAccess = clientNetworkAccessRepository
+                        .findByClientApplicationAndNeuralNetwork(client, network);
+                
+                if (existingAccess.isPresent()) {
+                    log.debug("⏭️ Доступ к {} уже существует, пропускаем", network.getName());
+                    skipped++;
+                    skippedNetworks.add(network.getDisplayName() + " (уже есть доступ)");
+                    continue;
+                }
+                
+                // Создаем новый доступ без лимитов (unlimited)
+                ClientNetworkAccess access = new ClientNetworkAccess(client, network, null, null);
+                clientNetworkAccessRepository.save(access);
+                
+                log.info("✅ Предоставлен доступ к: {} ({})", network.getDisplayName(), network.getNetworkType());
+                granted++;
+                grantedNetworks.add(network.getDisplayName() + " (" + network.getNetworkType() + ")");
+                
+            } catch (Exception e) {
+                log.error("❌ Ошибка предоставления доступа к {}: {}", network.getName(), e.getMessage());
+                skipped++;
+                skippedNetworks.add(network.getDisplayName() + " (ошибка)");
+            }
+        }
+        
+        log.info("===== Завершено предоставление доступа =====");
+        log.info("   Предоставлено: {}", granted);
+        log.info("   Пропущено: {}", skipped);
+        log.info("   Всего сетей: {}", activeNetworks.size());
+        
+        return java.util.Map.of(
+            "message", String.format("Предоставлен доступ к %d нейросетям (пропущено: %d)", granted, skipped),
+            "granted", granted,
+            "skipped", skipped,
+            "total", activeNetworks.size(),
+            "grantedNetworks", grantedNetworks,
+            "skippedNetworks", skippedNetworks,
+            "clientName", client.getName()
+        );
+    }
+    
+    /**
      * Статистика доступов
      */
     public static class AccessStats {
