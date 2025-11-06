@@ -7,10 +7,10 @@ services:
     container_name: ai-integration-db
     environment:
       POSTGRES_DB: ${DB_NAME:-ai_integration_db}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_USER: ${DB_USER:-ai_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ai_admin}
     ports:
-      - "${DB_PORT:-5433}:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -20,6 +20,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # AI Integration Admin Frontend
+  ai-admin-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai-admin-frontend
+    ports:
+      - "${FRONTEND_PORT:-3001}:80"
+    networks:
+      - ai-integration-network
+    depends_on:
+      - ai-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # AI Integration Service
   ai-service:
@@ -33,8 +52,8 @@ services:
     environment:
       # Database
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-ai_integration_db}
-      DB_USERNAME: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_USERNAME: ${DB_USER:-ai_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-ai_admin}
       
       # Server
       SERVER_PORT: 8091

@@ -2,6 +2,23 @@
 
 Универсальный сервис для интеграции с различными нейросетями (OpenAI GPT-4, Yandex GPT, Claude, Mistral, GigaChat, Whisper).
 
+## 📚 Документация по деплою
+
+### Быстрый старт:
+- **[🚀 QUICK_START.md](QUICK_START.md)** - Быстрый запуск backend (3 минуты)
+- **[⚡ TIMEWEB_QUICK_REFERENCE.md](TIMEWEB_QUICK_REFERENCE.md)** - Краткая памятка по всем командам
+
+### Деплой на Timeweb:
+1. **[🐳 Без Nginx (Docker only)](DOCKER_ONLY_DEPLOY.md)** - ⭐ **РЕКОМЕНДУЕТСЯ** - Всё в Docker, без настройки Nginx
+2. **[🔧 С Nginx (полный)](DEPLOYMENT_GUIDE.md)** - Полное руководство с Nginx
+3. **[🎨 Frontend отдельно](FRONTEND_DEPLOY_GUIDE.md)** - Если нужно деплоить фронт отдельно
+4. **[🔌 Интеграция с noteapp](NOTEAPP_INTEGRATION_GUIDE.md)** - Настройка noteapp для работы с AI Integration
+
+### Troubleshooting:
+- **[🔧 FIX_CONNECTION_ERROR.md](FIX_CONNECTION_ERROR.md)** - Исправление "Connection to localhost:5432 refused"
+
+---
+
 ## 🚀 Возможности
 
 - **Мульти-провайдерная поддержка**: OpenAI, Yandex, Anthropic Claude, Mistral, GigaChat, Whisper
