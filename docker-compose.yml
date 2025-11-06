@@ -43,6 +43,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-min-256-bits-for-production-change-this}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
       
+      # Encryption
+      ENCRYPTION_SECRET_KEY: ${ENCRYPTION_SECRET_KEY:-change-this-to-32-byte-secret-key-in-production!!!!!}
+      
       # AI Settings
       AI_REQUEST_TIMEOUT: ${AI_REQUEST_TIMEOUT:-60}
       AI_MAX_RETRIES: ${AI_MAX_RETRIES:-3}
