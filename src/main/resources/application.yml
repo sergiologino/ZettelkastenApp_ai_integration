@@ -22,6 +22,12 @@ spring:
     
 server:
   port: ${SERVER_PORT:8091}
+
+# Swagger Configuration
+swagger:
+  server:
+    url: ${SWAGGER_SERVER_URL:}
+    description: ${SWAGGER_SERVER_DESCRIPTION:Current server}
   
 # JWT Configuration
 jwt:

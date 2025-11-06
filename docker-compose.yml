@@ -58,6 +58,10 @@ services:
       # Server
       SERVER_PORT: 8091
       
+      # Swagger
+      SWAGGER_SERVER_URL: ${SWAGGER_SERVER_URL:-}
+      SWAGGER_SERVER_DESCRIPTION: ${SWAGGER_SERVER_DESCRIPTION:-Current server}
+      
       # JWT
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-min-256-bits-for-production-change-this}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
