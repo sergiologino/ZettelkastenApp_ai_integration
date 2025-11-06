@@ -1,0 +1,100 @@
+version: '3.8'
+
+# ⚠️ ВАЖНО: Эта версия для Timeweb без volumes
+# Данные БД будут храниться внутри контейнера и НЕ СОХРАНЯТСЯ при перезапуске!
+# Для production используйте backup БД регулярно!
+
+services:
+  # PostgreSQL database for AI Integration Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-integration-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ai_integration_db}
+      POSTGRES_USER: ${DB_USER:-ai_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ai_admin}
+    # ⚠️ Timeweb не позволяет пробрасывать порты наружу для БД
+    # Порт доступен только внутри Docker сети
+    networks:
+      - ai-integration-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ai_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # AI Integration Admin Frontend
+  ai-admin-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8091}
+    container_name: ai-admin-frontend
+    ports:
+      - "${FRONTEND_PORT:-3001}:80"
+    networks:
+      - ai-integration-network
+    depends_on:
+      - ai-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Integration Service
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-integration-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-ai_integration_db}
+      DB_USERNAME: ${DB_USER:-ai_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-ai_admin}
+      
+      # Server
+      SERVER_PORT: 8091
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-min-256-bits-for-production-change-this}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      
+      # Encryption
+      ENCRYPTION_SECRET_KEY: ${ENCRYPTION_SECRET_KEY:-change-this-to-32-byte-secret-key-in-production!!!!!}
+      
+      # AI Settings
+      AI_REQUEST_TIMEOUT: ${AI_REQUEST_TIMEOUT:-60}
+      AI_MAX_RETRIES: ${AI_MAX_RETRIES:-3}
+      AI_ENABLE_FALLBACK: ${AI_ENABLE_FALLBACK:-true}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SHOW_SQL: ${SHOW_SQL:-false}
+    ports:
+      - "${SERVICE_PORT:-8091}:8091"
+    networks:
+      - ai-integration-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  ai-integration-network:
+    driver: bridge
+
+# ⚠️ VOLUMES УДАЛЕНЫ для совместимости с Timeweb
+# Данные БД НЕ СОХРАНЯЮТСЯ между перезапусками контейнера!
+# ОБЯЗАТЕЛЬНО делайте backup БД регулярно:
+# docker exec ai-integration-db pg_dump -U ai_admin ai_integration_db > backup.sql
+

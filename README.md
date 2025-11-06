@@ -9,10 +9,11 @@
 - **[⚡ TIMEWEB_QUICK_REFERENCE.md](TIMEWEB_QUICK_REFERENCE.md)** - Краткая памятка по всем командам
 
 ### Деплой на Timeweb:
-1. **[🐳 Без Nginx (Docker only)](DOCKER_ONLY_DEPLOY.md)** - ⭐ **РЕКОМЕНДУЕТСЯ** - Всё в Docker, без настройки Nginx
-2. **[🔧 С Nginx (полный)](DEPLOYMENT_GUIDE.md)** - Полное руководство с Nginx
-3. **[🎨 Frontend отдельно](FRONTEND_DEPLOY_GUIDE.md)** - Если нужно деплоить фронт отдельно
-4. **[🔌 Интеграция с noteapp](NOTEAPP_INTEGRATION_GUIDE.md)** - Настройка noteapp для работы с AI Integration
+1. **[⚡ TIMEWEB (специальная версия)](TIMEWEB_DEPLOY.md)** - ⭐ **ДЛЯ TIMEWEB** - Без volumes, с автобэкапом
+2. **[🐳 Без Nginx (Docker only)](DOCKER_ONLY_DEPLOY.md)** - Для других хостингов с Docker
+3. **[🔧 С Nginx (полный)](DEPLOYMENT_GUIDE.md)** - Полное руководство с Nginx
+4. **[🎨 Frontend отдельно](FRONTEND_DEPLOY_GUIDE.md)** - Если нужно деплоить фронт отдельно
+5. **[🔌 Интеграция с noteapp](NOTEAPP_INTEGRATION_GUIDE.md)** - Настройка noteapp для работы с AI Integration
 
 ### Troubleshooting:
 - **[🔧 FIX_CONNECTION_ERROR.md](FIX_CONNECTION_ERROR.md)** - Исправление "Connection to localhost:5432 refused"
