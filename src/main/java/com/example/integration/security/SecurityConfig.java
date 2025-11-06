@@ -82,22 +82,13 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // ✅ В продакшене укажите конкретные домены вашего фронтенда
-        // Пример: configuration.setAllowedOrigins(Arrays.asList("https://altanote.ru", "https://admin.altanote.ru"));
-        String allowedOrigins = System.getenv("ALLOWED_ORIGINS");
-        if (allowedOrigins != null && !allowedOrigins.isEmpty()) {
-            // Если задана переменная окружения - используем её
-            configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
-            configuration.setAllowCredentials(true); // Можем использовать credentials с конкретными доменами
-        } else {
-            // Для разработки разрешаем все домены
-            configuration.setAllowedOriginPatterns(List.of("*"));
-            configuration.setAllowCredentials(false);
-        }
-        
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        // ✅ Для разработки - разрешаем все домены
+        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Authorization", "X-API-Key"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "X-API-Key", "Content-Type"));
+        configuration.setAllowCredentials(true); // Разрешаем credentials для Swagger UI
+        configuration.setMaxAge(3600L); // Кэшируем preflight на 1 час
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
