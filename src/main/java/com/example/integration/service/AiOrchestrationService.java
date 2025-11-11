@@ -249,7 +249,7 @@ public class AiOrchestrationService {
                 .map(access -> {
                     // Получаем полную информацию о нейросети по ID из DTO
                     UUID networkId = access.getNetworkId();
-                    log.debug("🔍 [AiOrchestrationService] Ищем нейросеть по ID: {}", networkId);
+                    log.info("🔍 [AiOrchestrationService] Ищем нейросеть по ID: {}", networkId);
                     
                     Optional<NeuralNetwork> networkOpt = neuralNetworkRepository.findById(networkId);
                     
@@ -261,11 +261,11 @@ public class AiOrchestrationService {
                     NeuralNetwork network = networkOpt.get();
                     
                     if (!network.getIsActive()) {
-                        log.debug("⚠️ [AiOrchestrationService] Нейросеть {} неактивна (is_active=false)", network.getDisplayName());
+                        log.warn("⚠️ [AiOrchestrationService] Нейросеть {} неактивна (is_active=false)", network.getDisplayName());
                         return null; // Пропускаем неактивные нейросети
                     }
                     
-                    log.debug("✅ [AiOrchestrationService] Найдена активная нейросеть: {} (тип: {}, provider: {})", 
+                    log.info("✅ [AiOrchestrationService] Найдена активная нейросеть: {} (тип: {}, provider: {})", 
                         network.getDisplayName(), network.getNetworkType(), network.getProvider());
                     
                     AvailableNetworkDTO dto = convertToAvailableNetworkDTO(network);
@@ -279,7 +279,7 @@ public class AiOrchestrationService {
                     boolean hasMonthlyLimit = access.getMonthlyRequestLimit() != null && access.getMonthlyRequestLimit() > 0;
                     dto.setHasLimits(hasDailyLimit || hasMonthlyLimit);
                     
-                    log.debug("   📊 Лимиты: daily={}, monthly={}, hasLimits={}", 
+                    log.info("   📊 Лимиты: daily={}, monthly={}, hasLimits={}", 
                         access.getDailyRequestLimit(), access.getMonthlyRequestLimit(), dto.getHasLimits());
                     
                     return dto;
@@ -290,7 +290,7 @@ public class AiOrchestrationService {
         log.info("✅ [AiOrchestrationService] Возвращаем {} доступных нейросетей для клиента {}", 
             networks.size(), clientApp.getName());
         networks.forEach(network -> {
-            log.debug("  - {} (тип: {}, provider: {}, приоритет: {})", 
+            log.info("  - {} (тип: {}, provider: {}, приоритет: {})", 
                 network.getDisplayName(), network.getNetworkType(), network.getProvider(), network.getPriority());
         });
         
