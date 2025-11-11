@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Главный сервис для обработки AI-запросов
@@ -240,30 +241,46 @@ public class AiOrchestrationService {
         log.info("🔍 [AiOrchestrationService] Получаем доступные нейросети для клиента: {} (ID: {})", 
             clientApp.getName(), clientApp.getId());
         
-        // Получаем все доступы клиента через NetworkAccessService
+        // Получаем все доступы клиента через NetworkAccessService (возвращает DTO)
         var accesses = networkAccessService.getAvailableNetworks(clientApp.getId());
         log.info("🔍 [AiOrchestrationService] Найдено {} доступов для клиента", accesses.size());
         
         List<AvailableNetworkDTO> networks = accesses.stream()
                 .map(access -> {
-                    // Получаем полную информацию о нейросети
-                    NeuralNetwork network = neuralNetworkRepository.findById(access.getNetworkId())
-                            .orElse(null);
+                    // Получаем полную информацию о нейросети по ID из DTO
+                    UUID networkId = access.getNetworkId();
+                    log.debug("🔍 [AiOrchestrationService] Ищем нейросеть по ID: {}", networkId);
                     
-                    if (network == null || !network.getIsActive()) {
-                        log.debug("⚠️ [AiOrchestrationService] Нейросеть {} не найдена или неактивна", access.getNetworkId());
+                    Optional<NeuralNetwork> networkOpt = neuralNetworkRepository.findById(networkId);
+                    
+                    if (networkOpt.isEmpty()) {
+                        log.warn("⚠️ [AiOrchestrationService] Нейросеть с ID {} не найдена в БД", networkId);
+                        return null;
+                    }
+                    
+                    NeuralNetwork network = networkOpt.get();
+                    
+                    if (!network.getIsActive()) {
+                        log.debug("⚠️ [AiOrchestrationService] Нейросеть {} неактивна (is_active=false)", network.getDisplayName());
                         return null; // Пропускаем неактивные нейросети
                     }
                     
-                    log.debug("✅ [AiOrchestrationService] Найдена нейросеть: {} (тип: {})", 
-                        network.getDisplayName(), network.getNetworkType());
+                    log.debug("✅ [AiOrchestrationService] Найдена активная нейросеть: {} (тип: {}, provider: {})", 
+                        network.getDisplayName(), network.getNetworkType(), network.getProvider());
                     
                     AvailableNetworkDTO dto = convertToAvailableNetworkDTO(network);
                     
                     // Добавляем информацию о лимитах из доступа
                     dto.setRemainingRequestsToday(access.getDailyRequestLimit());
                     dto.setRemainingRequestsMonth(access.getMonthlyRequestLimit());
-                    dto.setHasLimits(access.hasDailyLimit() || access.hasMonthlyLimit());
+                    
+                    // Проверяем наличие лимитов (null или > 0)
+                    boolean hasDailyLimit = access.getDailyRequestLimit() != null && access.getDailyRequestLimit() > 0;
+                    boolean hasMonthlyLimit = access.getMonthlyRequestLimit() != null && access.getMonthlyRequestLimit() > 0;
+                    dto.setHasLimits(hasDailyLimit || hasMonthlyLimit);
+                    
+                    log.debug("   📊 Лимиты: daily={}, monthly={}, hasLimits={}", 
+                        access.getDailyRequestLimit(), access.getMonthlyRequestLimit(), dto.getHasLimits());
                     
                     return dto;
                 })
@@ -273,8 +290,8 @@ public class AiOrchestrationService {
         log.info("✅ [AiOrchestrationService] Возвращаем {} доступных нейросетей для клиента {}", 
             networks.size(), clientApp.getName());
         networks.forEach(network -> {
-            log.debug("  - {} (тип: {}, приоритет: {})", 
-                network.getDisplayName(), network.getNetworkType(), network.getPriority());
+            log.debug("  - {} (тип: {}, provider: {}, приоритет: {})", 
+                network.getDisplayName(), network.getNetworkType(), network.getProvider(), network.getPriority());
         });
         
         return networks;
