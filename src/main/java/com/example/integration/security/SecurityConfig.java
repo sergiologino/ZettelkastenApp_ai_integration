@@ -1,5 +1,6 @@
 package com.example.integration.security;
 
+import com.example.integration.repository.ClientApplicationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -10,6 +11,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -22,11 +24,13 @@ import java.util.List;
 public class SecurityConfig {
     
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+    private final ClientApplicationRepository clientApplicationRepository;
     
-    public SecurityConfig() {
+    public SecurityConfig(ClientApplicationRepository clientApplicationRepository) {
+        this.clientApplicationRepository = clientApplicationRepository;
         log.warn("========================================");
         log.warn("🔧 SecurityConfig ЗАГРУЖЕН!");
-        log.warn("⚠️ ВНИМАНИЕ: Временная конфигурация без авторизации!");
+        log.warn("✅ API Key фильтр будет подключен!");
         log.warn("========================================");
     }
     
@@ -38,18 +42,30 @@ public class SecurityConfig {
     
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        log.warn("🔒 Настройка SecurityFilterChain - ВСЕ ENDPOINTS ОТКРЫТЫ");
+        log.warn("🔒 Настройка SecurityFilterChain с API Key фильтром");
         
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // ✅ ИСПРАВЛЕНИЕ: Добавляем API Key фильтр ПЕРЕД стандартной аутентификацией
+            .addFilterBefore(new ApiKeyAuthFilter(clientApplicationRepository), UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                // ⚠️ ВРЕМЕННО: Разрешаем ВСЕ запросы для отладки CORS
-                .anyRequest().permitAll()
+                // Публичные endpoints
+                .requestMatchers(
+                    "/actuator/**",
+                    "/swagger-ui/**",
+                    "/v3/api-docs/**",
+                    "/api/auth/**",
+                    "/api/admin/**"  // Админские endpoints (с JWT)
+                ).permitAll()
+                // Клиентские AI endpoints требуют X-API-Key
+                .requestMatchers("/api/ai/**").authenticated()
+                // Все остальное запрещено
+                .anyRequest().denyAll()
             );
         
-        log.warn("✅ SecurityFilterChain настроен - CORS включен, авторизация ОТКЛЮЧЕНА");
+        log.warn("✅ SecurityFilterChain настроен - API Key фильтр включен");
         return http.build();
     }
     
