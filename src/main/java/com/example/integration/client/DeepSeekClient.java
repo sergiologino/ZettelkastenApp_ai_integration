@@ -107,14 +107,19 @@ public class DeepSeekClient extends BaseNeuralClient {
     }
     
     @Override
-    protected HttpHeaders prepareHeaders(NeuralNetwork network) throws Exception {
+    protected HttpHeaders prepareHeaders(NeuralNetwork network) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         
         // DeepSeek использует Bearer token аутентификацию (как OpenAI)
         if (network.getApiKeyEncrypted() != null && !network.getApiKeyEncrypted().isEmpty()) {
-            String decryptedKey = encryptionService.decrypt(network.getApiKeyEncrypted());
-            headers.set("Authorization", "Bearer " + decryptedKey);
+            try {
+                String decryptedKey = encryptionService.decrypt(network.getApiKeyEncrypted());
+                headers.set("Authorization", "Bearer " + decryptedKey);
+            } catch (Exception e) {
+                System.err.println("❌ [DeepSeekClient] Ошибка расшифровки API ключа в prepareHeaders: " + e.getMessage());
+                throw new RuntimeException("Ошибка расшифровки API ключа для DeepSeek", e);
+            }
         }
         
         return headers;
