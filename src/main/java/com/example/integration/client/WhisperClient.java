@@ -38,10 +38,26 @@ public class WhisperClient extends BaseNeuralClient {
         // Подготавливаем multipart/form-data запрос
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        
+        System.out.println("🔑 [WhisperClient] Проверяем API ключ для Whisper:");
+        System.out.println("🔑 [WhisperClient]   - Network ID: " + network.getId());
+        System.out.println("🔑 [WhisperClient]   - Network name: " + network.getName());
+        System.out.println("🔑 [WhisperClient]   - API key encrypted присутствует: " + (network.getApiKeyEncrypted() != null && !network.getApiKeyEncrypted().isEmpty()));
+        
         if (network.getApiKeyEncrypted() != null && !network.getApiKeyEncrypted().isEmpty()) {
             // ✅ Расшифровываем ключ для Whisper API
-            String decryptedKey = encryptionService.decrypt(network.getApiKeyEncrypted());
-            headers.set("Authorization", "Bearer " + decryptedKey);
+            try {
+                String decryptedKey = encryptionService.decrypt(network.getApiKeyEncrypted());
+                headers.set("Authorization", "Bearer " + decryptedKey);
+                System.out.println("✅ [WhisperClient] Authorization header установлен (Bearer ***" + decryptedKey.substring(Math.max(0, decryptedKey.length() - 4)) + ")");
+            } catch (Exception e) {
+                System.err.println("❌ [WhisperClient] Ошибка расшифровки API ключа: " + e.getMessage());
+                throw new RuntimeException("Ошибка расшифровки API ключа для Whisper: " + e.getMessage(), e);
+            }
+        } else {
+            System.err.println("❌ [WhisperClient] API ключ для Whisper отсутствует!");
+            System.err.println("❌ [WhisperClient] Необходимо добавить API ключ OpenAI для нейросети 'whisper' в админ-панели AI Integration Service");
+            throw new RuntimeException("API ключ для Whisper отсутствует. Добавьте API ключ OpenAI в настройках нейросети.");
         }
         
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
