@@ -65,9 +65,23 @@ public class WhisperClient extends BaseNeuralClient {
         
         // Отправляем запрос
         String url = network.getApiUrl();
-        if (!url.contains("/audio/transcriptions")) {
-            url = url + "/v1/audio/transcriptions";
+        
+        // ✅ ИСПРАВЛЕНО: Проверяем, содержит ли URL уже полный путь
+        if (url.contains("/audio/transcriptions")) {
+            // URL уже содержит полный путь, используем как есть
+            System.out.println("🔍 [WhisperClient] URL уже содержит /audio/transcriptions: " + url);
+        } else if (url.endsWith("/v1") || url.endsWith("/v1/")) {
+            // URL заканчивается на /v1, добавляем только /audio/transcriptions
+            url = url.replaceAll("/+$", "") + "/audio/transcriptions";
+            System.out.println("✅ [WhisperClient] URL после добавления пути: " + url);
+        } else {
+            // URL не содержит /v1, добавляем полный путь
+            url = url.replaceAll("/+$", "") + "/v1/audio/transcriptions";
+            System.out.println("✅ [WhisperClient] URL после добавления /v1/audio/transcriptions: " + url);
         }
+        
+        System.out.println("🎤 [WhisperClient] Отправляем запрос к Whisper API: " + url);
+        System.out.println("🎤 [WhisperClient] Model: " + (network.getModelName() != null ? network.getModelName() : "whisper-1"));
         
         ResponseEntity<Map> response = restTemplate.exchange(
             url,
@@ -75,6 +89,8 @@ public class WhisperClient extends BaseNeuralClient {
             request,
             Map.class
         );
+        
+        System.out.println("✅ [WhisperClient] Получен ответ от Whisper API, status: " + response.getStatusCode());
         
         // Применяем маппинг ответа
         Map<String, Object> responseBody = response.getBody();
