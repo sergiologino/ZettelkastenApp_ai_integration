@@ -1,5 +1,6 @@
 package com.example.integration.security;
 
+import com.example.integration.repository.AdminUserRepository;
 import com.example.integration.repository.ClientApplicationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,12 +26,17 @@ public class SecurityConfig {
     
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
     private final ClientApplicationRepository clientApplicationRepository;
+    private final JwtAuthFilter jwtAuthFilter;
     
-    public SecurityConfig(ClientApplicationRepository clientApplicationRepository) {
+    public SecurityConfig(
+        ClientApplicationRepository clientApplicationRepository,
+        JwtAuthFilter jwtAuthFilter
+    ) {
         this.clientApplicationRepository = clientApplicationRepository;
+        this.jwtAuthFilter = jwtAuthFilter;
         log.warn("========================================");
         log.warn("🔧 SecurityConfig ЗАГРУЖЕН!");
-        log.warn("✅ API Key фильтр будет подключен!");
+        log.warn("✅ JWT и API Key фильтры будут подключены!");
         log.warn("========================================");
     }
     
@@ -48,25 +54,32 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // ✅ ИСПРАВЛЕНИЕ: Добавляем API Key фильтр ПЕРЕД стандартной аутентификацией
+            // Поддерживаем авторизацию по JWT и X-API-Key
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new ApiKeyAuthFilter(clientApplicationRepository), UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
                 // Публичные endpoints
                 .requestMatchers(
                     "/actuator/**",
                     "/swagger-ui/**",
-                    "/v3/api-docs/**",
-                    "/api/auth/**",
-                    "/api/admin/**"  // Админские endpoints (с JWT)
+                    "/v3/api-docs/**"
                 ).permitAll()
-                // Клиентские AI endpoints требуют X-API-Key
+                .requestMatchers("/api/auth/**").permitAll()
+                // Админские endpoints доступны только с JWT
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // Клиентские AI endpoints требуют X-API-Key (авторизацию настраивает ApiKey фильтр)
                 .requestMatchers("/api/ai/**").authenticated()
                 // Все остальное запрещено
                 .anyRequest().denyAll()
             );
         
-        log.warn("✅ SecurityFilterChain настроен - API Key фильтр включен");
+        log.warn("✅ SecurityFilterChain настроен - JWT и API Key фильтры включены");
         return http.build();
+    }
+    
+    @Bean
+    public JwtAuthFilter jwtAuthFilter(JwtUtil jwtUtil, AdminUserRepository adminUserRepository) {
+        return new JwtAuthFilter(jwtUtil, adminUserRepository);
     }
     
     @Bean
