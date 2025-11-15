@@ -1,5 +1,6 @@
 package com.example.integration.security;
 
+import com.example.integration.repository.AdminUserRepository;
 import com.example.integration.repository.ClientApplicationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
