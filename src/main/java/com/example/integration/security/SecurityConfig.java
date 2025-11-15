@@ -1,11 +1,11 @@
 package com.example.integration.security;
 
-import com.example.integration.repository.AdminUserRepository;
 import com.example.integration.repository.ClientApplicationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -27,6 +27,9 @@ public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
     private final ClientApplicationRepository clientApplicationRepository;
     private final JwtAuthFilter jwtAuthFilter;
+    private static final List<String> FRONTEND_ORIGINS = List.of(
+        "https://sergiologino-ai-integration-front-cd2e.twc1.net"
+    );
     
     public SecurityConfig(
         ClientApplicationRepository clientApplicationRepository,
@@ -58,6 +61,8 @@ public class SecurityConfig {
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new ApiKeyAuthFilter(clientApplicationRepository), UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
+                // Preflight
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Публичные endpoints
                 .requestMatchers(
                     "/actuator/**",
@@ -87,8 +92,7 @@ public class SecurityConfig {
         log.info("🌐 Настройка CORS - разрешены все домены");
         
         CorsConfiguration configuration = new CorsConfiguration();
-        
-        // ✅ Для разработки - разрешаем все домены
+        configuration.setAllowedOrigins(FRONTEND_ORIGINS);
         configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
