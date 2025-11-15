@@ -1,6 +1,5 @@
 package com.example.integration.security;
 
-import com.example.integration.repository.AdminUserRepository;
 import com.example.integration.repository.ClientApplicationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,12 +81,6 @@ public class SecurityConfig {
         log.warn("✅ SecurityFilterChain настроен - JWT и API Key фильтры включены");
         return http.build();
     }
-    
-    @Bean
-    public JwtAuthFilter jwtAuthFilter(JwtUtil jwtUtil, AdminUserRepository adminUserRepository) {
-        return new JwtAuthFilter(jwtUtil, adminUserRepository);
-    }
-    
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         log.info("🌐 Настройка CORS - разрешены все домены");
