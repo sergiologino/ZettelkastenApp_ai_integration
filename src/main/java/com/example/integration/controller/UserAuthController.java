@@ -32,13 +32,13 @@ public class UserAuthController {
     @Value("${oauth.google.client-id:}")
     private String googleClientId;
 
-    @Value("${oauth.google.redirect-uri:https://sergiologino-ai-integration-front-cd2e.twc1.net/login/oauth2/code/google}")
+    @Value("${oauth.google.redirect-uri:https://sergiologino-zettelkastenapp-ai-integration-bce3.twc1.net/login/oauth2/code/google}")
     private String googleRedirectUri;
 
     @Value("${oauth.yandex.client-id:}")
     private String yandexClientId;
 
-    @Value("${oauth.yandex.redirect-uri:https://sergiologino-ai-integration-front-cd2e.twc1.net/login/oauth2/code/yandex}")
+    @Value("${oauth.yandex.redirect-uri:https://sergiologino-zettelkastenapp-ai-integration-bce3.twc1.net/login/oauth2/code/yandex}")
     private String yandexRedirectUri;
 
     @Value("${oauth.frontend.base:https://sergiologino-ai-integration-front-cd2e.twc1.net}")
@@ -143,13 +143,6 @@ public class UserAuthController {
         }
     }
 
-    // Допускаем совместимость с путями /login/oauth2/code/{provider}
-    @GetMapping("/../../../login/oauth2/code/{provider}")
-    public ResponseEntity<?> oauthCallbackCompat(@PathVariable("provider") String provider,
-                                                 @RequestParam(name = "code", required = false) String code,
-                                                 @RequestParam(name = "state", required = false) String state) {
-        return oauthCallbackNew(provider, code, state);
-    }
 
     private String urlEnc(String s) {
         return URLEncoder.encode(s == null ? "" : s, StandardCharsets.UTF_8);

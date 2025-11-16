@@ -26,11 +26,11 @@ oauth:
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
     client-secret: ${GOOGLE_CLIENT_SECRET:}
-    redirect-uri: ${GOOGLE_REDIRECT_URI:https://sergiologino-ai-integration-front-cd2e.twc1.net/login/oauth2/code/google}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:https://sergiologino-zettelkastenapp-ai-integration-bce3.twc1.net/login/oauth2/code/google}
   yandex:
     client-id: ${YANDEX_CLIENT_ID:}
     client-secret: ${YANDEX_CLIENT_SECRET:}
-    redirect-uri: ${YANDEX_REDIRECT_URI:https://sergiologino-ai-integration-front-cd2e.twc1.net/login/oauth2/code/yandex}
+    redirect-uri: ${YANDEX_REDIRECT_URI:https://sergiologino-zettelkastenapp-ai-integration-bce3.twc1.net/login/oauth2/code/yandex}
     
 server:
   port: ${SERVER_PORT:8091}
