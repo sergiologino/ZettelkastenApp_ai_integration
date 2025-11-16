@@ -70,9 +70,13 @@ public class SecurityConfig {
                     "/v3/api-docs/**"
                 ).permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
-                // Админские endpoints доступны только с JWT
+                .requestMatchers("/api/user/auth/**").permitAll()
+                .requestMatchers("/login/**").permitAll()
+                // Админские endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                // Клиентские AI endpoints требуют X-API-Key (авторизацию настраивает ApiKey фильтр)
+                // Пользовательский кабинет
+                .requestMatchers("/api/user/**").hasRole("USER")
+                // Клиентские AI endpoints требуют X-API-Key (авторизацию настраивает ApiKeyAuthFilter)
                 .requestMatchers("/api/ai/**").authenticated()
                 // Все остальное запрещено
                 .anyRequest().denyAll()
