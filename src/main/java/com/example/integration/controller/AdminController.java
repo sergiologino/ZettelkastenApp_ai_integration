@@ -161,9 +161,10 @@ public class AdminController {
     
     // ==================== Request Logs ====================
     
-    @GetMapping({"/logs", "/request-logs"})
+    @GetMapping({"/logs", "/request-logs", "/rl"})
     @Operation(summary = "Get request logs", description = "Get paginated list of request logs")
-    public ResponseEntity<Page<RequestLog>> getLogs(
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ResponseEntity<Page<com.example.integration.dto.RequestLogDTO>> getLogs(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "50") int size,
         @RequestParam(required = false) String status
@@ -176,8 +177,28 @@ public class AdminController {
         } else {
             logs = requestLogRepository.findAll(pageable);
         }
-        
-        return ResponseEntity.ok(logs);
+
+        Page<com.example.integration.dto.RequestLogDTO> dtoPage = logs.map(log -> {
+            var nn = log.getNeuralNetwork();
+            var client = log.getClientApp();
+            return new com.example.integration.dto.RequestLogDTO(
+                log.getId(),
+                log.getExternalUserId(),
+                nn != null ? nn.getId() : null,
+                nn != null ? nn.getDisplayName() : null,
+                client != null ? client.getId() : null,
+                client != null ? client.getName() : null,
+                log.getRequestType(),
+                log.getPrompt(),
+                log.getResponse(),
+                "success".equalsIgnoreCase(log.getStatus()),
+                log.getErrorMessage(),
+                log.getTokensUsed(),
+                log.getCreatedAt()
+            );
+        });
+
+        return ResponseEntity.ok(dtoPage);
     }
     
     @GetMapping("/logs/{id}")
