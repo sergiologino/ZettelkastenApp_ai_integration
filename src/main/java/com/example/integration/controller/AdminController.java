@@ -181,17 +181,21 @@ public class AdminController {
         Page<com.example.integration.dto.RequestLogDTO> dtoPage = logs.map(log -> {
             var nn = log.getNeuralNetwork();
             var client = log.getClientApp();
+            String externalUserId = (log.getExternalUser() != null) ? String.valueOf(log.getExternalUser().getId()) : null;
+            String prompt = (log.getRequestPayload() != null) ? log.getRequestPayload().toString() : null;
+            String response = (log.getResponsePayload() != null) ? log.getResponsePayload().toString() : null;
+            boolean success = "success".equalsIgnoreCase(log.getStatus());
             return new com.example.integration.dto.RequestLogDTO(
                 log.getId(),
-                log.getExternalUserId(),
+                externalUserId,
                 nn != null ? nn.getId() : null,
                 nn != null ? nn.getDisplayName() : null,
                 client != null ? client.getId() : null,
                 client != null ? client.getName() : null,
                 log.getRequestType(),
-                log.getPrompt(),
-                log.getResponse(),
-                "success".equalsIgnoreCase(log.getStatus()),
+                prompt,
+                response,
+                success,
                 log.getErrorMessage(),
                 log.getTokensUsed(),
                 log.getCreatedAt()

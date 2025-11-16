@@ -1,6 +1,6 @@
 package com.example.integration.dto;
 
-import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public class RequestLogDTO {
@@ -16,7 +16,7 @@ public class RequestLogDTO {
     public boolean success;
     public String errorMessage;
     public Integer tokensUsed;
-    public OffsetDateTime createdAt;
+    public LocalDateTime createdAt;
 
     public RequestLogDTO() {}
 
@@ -33,7 +33,7 @@ public class RequestLogDTO {
             boolean success,
             String errorMessage,
             Integer tokensUsed,
-            OffsetDateTime createdAt
+            LocalDateTime createdAt
     ) {
         this.id = id;
         this.externalUserId = externalUserId;
