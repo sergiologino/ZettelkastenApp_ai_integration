@@ -161,7 +161,7 @@ public class AdminController {
     
     // ==================== Request Logs ====================
     
-    @GetMapping("/logs")
+    @GetMapping({"/logs", "/request-logs"})
     @Operation(summary = "Get request logs", description = "Get paginated list of request logs")
     public ResponseEntity<Page<RequestLog>> getLogs(
         @RequestParam(defaultValue = "0") int page,
