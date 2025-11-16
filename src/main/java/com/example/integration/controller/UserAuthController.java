@@ -15,11 +15,19 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import com.example.integration.service.OAuthService;
+import com.example.integration.service.OAuthService.GoogleUserInfo;
+import com.example.integration.service.OAuthService.YandexUserInfo;
+import com.example.integration.model.UserAccount;
+import com.example.integration.security.JwtUtil;
+
 @RestController
 @RequestMapping("/api/user/auth")
 public class UserAuthController {
 
     private final UserService userService;
+    private final OAuthService oAuthService;
+    private final JwtUtil jwtUtil;
 
     @Value("${oauth.google.client-id:}")
     private String googleClientId;
@@ -36,8 +44,10 @@ public class UserAuthController {
     @Value("${oauth.frontend.base:https://sergiologino-ai-integration-front-cd2e.twc1.net}")
     private String oauthFrontendBase;
 
-    public UserAuthController(UserService userService) {
+    public UserAuthController(UserService userService, OAuthService oAuthService, JwtUtil jwtUtil) {
         this.userService = userService;
+        this.oAuthService = oAuthService;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/register")
@@ -94,7 +104,6 @@ public class UserAuthController {
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 
-    // Заглушка: колбэки пока возвращают 400, пока не настроены client_id/secret и обмен кода
     @GetMapping("/oauth2/callback/{provider}")
     public ResponseEntity<?> oauthCallbackNew(@PathVariable("provider") String provider,
                                               @RequestParam(name = "code", required = false) String code,
@@ -105,8 +114,33 @@ public class UserAuthController {
         if (!userService.validateAndConsumeState(state)) {
             return ResponseEntity.badRequest().body(Map.of("error", "state некорректен или истёк"));
         }
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .body(Map.of("error", "OAuth не настроен: отсутствуют client_id/secret"));
+        try {
+            String token;
+            if ("google".equalsIgnoreCase(provider)) {
+                GoogleUserInfo info = oAuthService.exchangeGoogle(code);
+                UserAccount user = userService.upsertOauthUser("google", info.sub, info.email, info.name);
+                token = jwtUtil.generateToken(user.getEmail());
+            } else if ("yandex".equalsIgnoreCase(provider)) {
+                YandexUserInfo info = oAuthService.exchangeYandex(code);
+                UserAccount user = userService.upsertOauthUser("yandex", info.id, info.defaultEmail, info.displayName);
+                token = jwtUtil.generateToken(user.getEmail());
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("error", "Неизвестный провайдер"));
+            }
+            String redirectTo = oauthFrontendBase
+                    + "/auth?ok=1&provider=" + urlEnc(provider)
+                    + "&token=" + urlEnc(token);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setLocation(URI.create(redirectTo));
+            return new ResponseEntity<>(headers, HttpStatus.FOUND);
+        } catch (Exception ex) {
+            String redirectTo = oauthFrontendBase
+                    + "/auth?ok=0&provider=" + urlEnc(provider)
+                    + "&error=" + urlEnc(ex.getMessage() == null ? "oauth_failed" : ex.getMessage());
+            HttpHeaders headers = new HttpHeaders();
+            headers.setLocation(URI.create(redirectTo));
+            return new ResponseEntity<>(headers, HttpStatus.FOUND);
+        }
     }
 
     // Допускаем совместимость с путями /login/oauth2/code/{provider}
