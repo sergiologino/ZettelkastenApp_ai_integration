@@ -4,6 +4,7 @@ import com.example.integration.dto.user.ClientApplicationDto;
 import com.example.integration.dto.user.ClientCreateRequest;
 import com.example.integration.dto.user.ClientUpdateRequest;
 import com.example.integration.dto.user.NetworkUsageStatsDto;
+import com.example.integration.dto.user.SetClientNetworksRequest;
 import com.example.integration.service.UserClientService;
 import com.example.integration.service.UserContextService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -96,6 +97,28 @@ public class UserClientController {
     @GetMapping("/networks/available")
     public ResponseEntity<?> availableNetworks() {
         return ResponseEntity.ok(userClientService.getAvailableNetworks());
+    }
+
+    /**
+     * Установить список подключенных нейросетей для клиента
+     */
+    @PutMapping("/clients/{id}/networks")
+    public ResponseEntity<?> setClientNetworks(HttpServletRequest request, 
+                                                @PathVariable("id") UUID id,
+                                                @RequestBody SetClientNetworksRequest req) {
+        return userContextService.resolveCurrentUser(request)
+                .<ResponseEntity<?>>map(user -> {
+                    try {
+                        if (req.getNetworkIds() == null) {
+                            return ResponseEntity.badRequest().body(Map.of("error", "networkIds обязателен"));
+                        }
+                        userClientService.setClientNetworks(user, id, req.getNetworkIds());
+                        return ResponseEntity.noContent().build();
+                    } catch (IllegalArgumentException ex) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+                    }
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
     /**

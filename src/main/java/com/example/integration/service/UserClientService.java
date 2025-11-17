@@ -6,10 +6,12 @@ import com.example.integration.dto.user.ClientCreateRequest;
 import com.example.integration.dto.user.ClientUpdateRequest;
 import com.example.integration.dto.user.NetworkUsageStatsDto;
 import com.example.integration.model.ClientApplication;
+import com.example.integration.model.ClientNetworkAccess;
 import com.example.integration.model.NeuralNetwork;
 import com.example.integration.model.UserAccount;
 import com.example.integration.model.UserClientLink;
 import com.example.integration.repository.ClientApplicationRepository;
+import com.example.integration.repository.ClientNetworkAccessRepository;
 import com.example.integration.repository.NeuralNetworkRepository;
 import com.example.integration.repository.RequestLogRepository;
 import com.example.integration.repository.UserClientLinkRepository;
@@ -30,15 +32,18 @@ public class UserClientService {
     private final UserClientLinkRepository linkRepository;
     private final NeuralNetworkRepository neuralNetworkRepository;
     private final RequestLogRepository requestLogRepository;
+    private final ClientNetworkAccessRepository clientNetworkAccessRepository;
 
     public UserClientService(ClientApplicationRepository clientApplicationRepository,
                              UserClientLinkRepository linkRepository,
                              NeuralNetworkRepository neuralNetworkRepository,
-                             RequestLogRepository requestLogRepository) {
+                             RequestLogRepository requestLogRepository,
+                             ClientNetworkAccessRepository clientNetworkAccessRepository) {
         this.clientApplicationRepository = clientApplicationRepository;
         this.linkRepository = linkRepository;
         this.neuralNetworkRepository = neuralNetworkRepository;
         this.requestLogRepository = requestLogRepository;
+        this.clientNetworkAccessRepository = clientNetworkAccessRepository;
     }
 
     public List<ClientApplicationDto> list(UserAccount user) {
@@ -112,6 +117,15 @@ public class UserClientService {
         dto.setApiKey(app.getApiKey());
         dto.setIsActive(app.getIsActive());
         dto.setDeleted(app.getDeleted());
+        
+        // Загружаем подключенные сети
+        List<ClientNetworkAccess> accesses = clientNetworkAccessRepository
+                .findByClientApplicationOrderByNeuralNetworkDisplayNameAsc(app);
+        List<UUID> networkIds = accesses.stream()
+                .map(access -> access.getNeuralNetwork().getId())
+                .collect(Collectors.toList());
+        dto.setNetworkIds(networkIds);
+        
         dto.setCreatedAt(app.getCreatedAt());
         dto.setUpdatedAt(app.getUpdatedAt());
         return dto;
@@ -128,18 +142,50 @@ public class UserClientService {
     }
 
     /**
-     * Получить статистику использования нейросетей для клиента
+     * Сохранить список подключенных нейросетей для клиента
+     */
+    public void setClientNetworks(UserAccount user, UUID clientId, List<UUID> networkIds) {
+        // Проверяем, что клиент принадлежит пользователю
+        ClientApplication client = ensureOwned(user, clientId)
+                .orElseThrow(() -> new IllegalArgumentException("Клиент не найден или недоступен"));
+        
+        // Получаем текущие подключения
+        List<ClientNetworkAccess> currentAccesses = clientNetworkAccessRepository
+                .findByClientApplicationOrderByNeuralNetworkDisplayNameAsc(client);
+        
+        // Удаляем все текущие подключения
+        clientNetworkAccessRepository.deleteAll(currentAccesses);
+        
+        // Создаем новые подключения для выбранных сетей
+        for (UUID networkId : networkIds) {
+            NeuralNetwork network = neuralNetworkRepository.findById(networkId)
+                    .orElseThrow(() -> new IllegalArgumentException("Нейросеть не найдена: " + networkId));
+            
+            // Проверяем, что сеть активна
+            if (!network.getIsActive()) {
+                throw new IllegalArgumentException("Нейросеть не активна: " + network.getName());
+            }
+            
+            ClientNetworkAccess access = new ClientNetworkAccess(client, network);
+            clientNetworkAccessRepository.save(access);
+        }
+    }
+
+    /**
+     * Получить статистику использования нейросетей для клиента (только подключенные сети)
      */
     public List<NetworkUsageStatsDto> getNetworkUsageStats(UserAccount user, UUID clientId) {
         // Проверяем, что клиент принадлежит пользователю
         ClientApplication client = ensureOwned(user, clientId)
                 .orElseThrow(() -> new IllegalArgumentException("Клиент не найден или недоступен"));
         
-        // Получаем все активные нейросети
-        List<NeuralNetwork> networks = neuralNetworkRepository.findByIsActiveTrue();
+        // Получаем только подключенные нейросети
+        List<ClientNetworkAccess> accesses = clientNetworkAccessRepository
+                .findByClientApplicationOrderByNeuralNetworkDisplayNameAsc(client);
         
-        return networks.stream()
-                .map(network -> {
+        return accesses.stream()
+                .map(access -> {
+                    NeuralNetwork network = access.getNeuralNetwork();
                     NetworkUsageStatsDto stats = new NetworkUsageStatsDto();
                     stats.setNetworkId(network.getId());
                     stats.setNetworkName(network.getName());

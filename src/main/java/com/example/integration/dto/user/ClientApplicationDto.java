@@ -1,6 +1,7 @@
 package com.example.integration.dto.user;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public class ClientApplicationDto {
@@ -10,6 +11,7 @@ public class ClientApplicationDto {
     private String apiKey;
     private Boolean isActive;
     private Boolean deleted;
+    private List<UUID> networkIds;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -29,6 +31,8 @@ public class ClientApplicationDto {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public List<UUID> getNetworkIds() { return networkIds; }
+    public void setNetworkIds(List<UUID> networkIds) { this.networkIds = networkIds; }
 }
 
 
