@@ -87,6 +87,9 @@ public class SecurityConfig {
                 // НЕ используем общее правило /api/user/** чтобы избежать конфликтов с /api/user/auth/**
                 .requestMatchers("/api/user/clients/**").hasRole("USER")
                 .requestMatchers("/api/user/networks/**").hasRole("USER")
+                .requestMatchers("/api/user/subscriptions/**").hasRole("USER")
+                // Webhook от платежных провайдеров (публичный, но должен быть защищен на уровне провайдера)
+                .requestMatchers("/api/payments/webhook/**").permitAll()
                 // Если появятся новые пути в /api/user/, добавляйте их здесь явно
                 // Клиентские AI endpoints требуют X-API-Key (авторизацию настраивает ApiKeyAuthFilter)
                 .requestMatchers("/api/ai/**").authenticated()

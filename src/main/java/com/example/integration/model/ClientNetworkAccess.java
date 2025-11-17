@@ -29,6 +29,9 @@ public class ClientNetworkAccess {
 
     @Column(name = "monthly_request_limit")
     private Integer monthlyRequestLimit;
+    
+    @Column(name = "free_request_limit")
+    private Integer freeRequestLimit; // Лимит бесплатных запросов для бесплатного плана
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -94,6 +97,14 @@ public class ClientNetworkAccess {
 
     public void setMonthlyRequestLimit(Integer monthlyRequestLimit) {
         this.monthlyRequestLimit = monthlyRequestLimit;
+    }
+    
+    public Integer getFreeRequestLimit() {
+        return freeRequestLimit;
+    }
+    
+    public void setFreeRequestLimit(Integer freeRequestLimit) {
+        this.freeRequestLimit = freeRequestLimit;
     }
 
     public LocalDateTime getCreatedAt() {

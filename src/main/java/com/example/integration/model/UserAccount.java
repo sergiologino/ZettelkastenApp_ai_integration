@@ -35,10 +35,34 @@ public class UserAccount {
 
     @Column(name = "updated_at", nullable = false)
     private java.sql.Timestamp updatedAt = java.sql.Timestamp.from(Instant.now());
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subscription_status", length = 20)
+    private SubscriptionStatus subscriptionStatus = SubscriptionStatus.FREE;
+    
+    @Column(name = "subscription_expires_at")
+    private java.sql.Timestamp subscriptionExpiresAt;
 
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = java.sql.Timestamp.from(Instant.now());
+    }
+    
+    public enum SubscriptionStatus {
+        FREE,
+        ACTIVE,
+        EXPIRED,
+        CANCELLED
+    }
+    
+    public boolean hasActiveSubscription() {
+        if (subscriptionStatus != SubscriptionStatus.ACTIVE) {
+            return false;
+        }
+        if (subscriptionExpiresAt == null) {
+            return true;
+        }
+        return subscriptionExpiresAt.after(java.sql.Timestamp.from(Instant.now()));
     }
 
     // getters and setters
@@ -68,6 +92,12 @@ public class UserAccount {
 
     public java.sql.Timestamp getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(java.sql.Timestamp updatedAt) { this.updatedAt = updatedAt; }
+    
+    public SubscriptionStatus getSubscriptionStatus() { return subscriptionStatus; }
+    public void setSubscriptionStatus(SubscriptionStatus subscriptionStatus) { this.subscriptionStatus = subscriptionStatus; }
+    
+    public java.sql.Timestamp getSubscriptionExpiresAt() { return subscriptionExpiresAt; }
+    public void setSubscriptionExpiresAt(java.sql.Timestamp subscriptionExpiresAt) { this.subscriptionExpiresAt = subscriptionExpiresAt; }
 }
 
 
