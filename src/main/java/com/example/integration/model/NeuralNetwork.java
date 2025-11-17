@@ -70,6 +70,9 @@ public class NeuralNetwork {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
     
+    @Column(name = "connection_instruction", columnDefinition = "TEXT")
+    private String connectionInstruction;
+    
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();

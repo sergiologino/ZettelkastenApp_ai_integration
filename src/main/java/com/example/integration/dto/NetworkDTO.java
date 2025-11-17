@@ -20,6 +20,7 @@ public class NetworkDTO {
     private Integer maxRetries;
     private Map<String, Object> requestMapping;
     private Map<String, Object> responseMapping;
+    private String connectionInstruction;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

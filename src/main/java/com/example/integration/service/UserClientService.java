@@ -1,12 +1,17 @@
 package com.example.integration.service;
 
+import com.example.integration.dto.user.AvailableNetworkDto;
 import com.example.integration.dto.user.ClientApplicationDto;
 import com.example.integration.dto.user.ClientCreateRequest;
 import com.example.integration.dto.user.ClientUpdateRequest;
+import com.example.integration.dto.user.NetworkUsageStatsDto;
 import com.example.integration.model.ClientApplication;
+import com.example.integration.model.NeuralNetwork;
 import com.example.integration.model.UserAccount;
 import com.example.integration.model.UserClientLink;
 import com.example.integration.repository.ClientApplicationRepository;
+import com.example.integration.repository.NeuralNetworkRepository;
+import com.example.integration.repository.RequestLogRepository;
 import com.example.integration.repository.UserClientLinkRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -23,11 +28,17 @@ public class UserClientService {
 
     private final ClientApplicationRepository clientApplicationRepository;
     private final UserClientLinkRepository linkRepository;
+    private final NeuralNetworkRepository neuralNetworkRepository;
+    private final RequestLogRepository requestLogRepository;
 
     public UserClientService(ClientApplicationRepository clientApplicationRepository,
-                             UserClientLinkRepository linkRepository) {
+                             UserClientLinkRepository linkRepository,
+                             NeuralNetworkRepository neuralNetworkRepository,
+                             RequestLogRepository requestLogRepository) {
         this.clientApplicationRepository = clientApplicationRepository;
         this.linkRepository = linkRepository;
+        this.neuralNetworkRepository = neuralNetworkRepository;
+        this.requestLogRepository = requestLogRepository;
     }
 
     public List<ClientApplicationDto> list(UserAccount user) {
@@ -103,6 +114,64 @@ public class UserClientService {
         dto.setDeleted(app.getDeleted());
         dto.setCreatedAt(app.getCreatedAt());
         dto.setUpdatedAt(app.getUpdatedAt());
+        return dto;
+    }
+
+    /**
+     * Получить список доступных активных нейросетей
+     */
+    public List<AvailableNetworkDto> getAvailableNetworks() {
+        return neuralNetworkRepository.findByIsActiveTrue()
+                .stream()
+                .map(this::toAvailableNetworkDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Получить статистику использования нейросетей для клиента
+     */
+    public List<NetworkUsageStatsDto> getNetworkUsageStats(UserAccount user, UUID clientId) {
+        // Проверяем, что клиент принадлежит пользователю
+        ClientApplication client = ensureOwned(user, clientId)
+                .orElseThrow(() -> new IllegalArgumentException("Клиент не найден или недоступен"));
+        
+        // Получаем все активные нейросети
+        List<NeuralNetwork> networks = neuralNetworkRepository.findByIsActiveTrue();
+        
+        return networks.stream()
+                .map(network -> {
+                    NetworkUsageStatsDto stats = new NetworkUsageStatsDto();
+                    stats.setNetworkId(network.getId());
+                    stats.setNetworkName(network.getName());
+                    stats.setNetworkDisplayName(network.getDisplayName());
+                    stats.setProvider(network.getProvider());
+                    stats.setNetworkType(network.getNetworkType());
+                    
+                    // Получаем статистику использования
+                    Long totalRequests = requestLogRepository.countByClientAndNetwork(client.getId(), network.getId());
+                    Long successfulRequests = requestLogRepository.countSuccessfulByClientAndNetwork(client.getId(), network.getId());
+                    Long failedRequests = requestLogRepository.countFailedByClientAndNetwork(client.getId(), network.getId());
+                    Long totalTokensUsed = requestLogRepository.sumTokensByClientAndNetwork(client.getId(), network.getId());
+                    
+                    stats.setTotalRequests(totalRequests != null ? totalRequests : 0L);
+                    stats.setSuccessfulRequests(successfulRequests != null ? successfulRequests : 0L);
+                    stats.setFailedRequests(failedRequests != null ? failedRequests : 0L);
+                    stats.setTotalTokensUsed(totalTokensUsed != null ? totalTokensUsed : 0L);
+                    stats.setAvailableTokens(null); // TODO: добавить логику расчета доступных токенов на основе лимитов
+                    
+                    return stats;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private AvailableNetworkDto toAvailableNetworkDto(NeuralNetwork network) {
+        AvailableNetworkDto dto = new AvailableNetworkDto();
+        dto.setId(network.getId());
+        dto.setCode(network.getName());
+        dto.setLabel(network.getDisplayName());
+        dto.setProvider(network.getProvider());
+        dto.setNetworkType(network.getNetworkType());
+        dto.setConnectionInstruction(network.getConnectionInstruction());
         return dto;
     }
 

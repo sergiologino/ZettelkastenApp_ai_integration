@@ -3,6 +3,7 @@ package com.example.integration.controller;
 import com.example.integration.dto.user.ClientApplicationDto;
 import com.example.integration.dto.user.ClientCreateRequest;
 import com.example.integration.dto.user.ClientUpdateRequest;
+import com.example.integration.dto.user.NetworkUsageStatsDto;
 import com.example.integration.service.UserClientService;
 import com.example.integration.service.UserContextService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -89,17 +90,29 @@ public class UserClientController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
-    // Черновые ручки сетей
+    /**
+     * Получить список доступных активных нейросетей
+     */
     @GetMapping("/networks/available")
     public ResponseEntity<?> availableNetworks() {
-        // Временно возвращаем фиксированный набор; позже подменим на реальные данные
-        List<Map<String, String>> networks = List.of(
-                Map.of("code", "gpt-4o", "label", "OpenAI GPT-4o"),
-                Map.of("code", "claude-3-5", "label", "Anthropic Claude 3.5"),
-                Map.of("code", "yandexgpt", "label", "YandexGPT"),
-                Map.of("code", "gemini-1.5", "label", "Google Gemini 1.5")
-        );
-        return ResponseEntity.ok(networks);
+        return ResponseEntity.ok(userClientService.getAvailableNetworks());
+    }
+
+    /**
+     * Получить статистику использования нейросетей для клиента
+     */
+    @GetMapping("/clients/{id}/networks/stats")
+    public ResponseEntity<?> getNetworkStats(HttpServletRequest request, @PathVariable("id") UUID id) {
+        return userContextService.resolveCurrentUser(request)
+                .<ResponseEntity<?>>map(user -> {
+                    try {
+                        List<NetworkUsageStatsDto> stats = userClientService.getNetworkUsageStats(user, id);
+                        return ResponseEntity.ok(stats);
+                    } catch (IllegalArgumentException ex) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+                    }
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 }
 

@@ -75,6 +75,7 @@ public class NetworkManagementService {
         network.setMaxRetries(request.getMaxRetries());
         network.setRequestMapping(request.getRequestMapping());
         network.setResponseMapping(request.getResponseMapping());
+        network.setConnectionInstruction(request.getConnectionInstruction());
         
         network = neuralNetworkRepository.save(network);
         return toDTO(network);
@@ -108,6 +109,7 @@ public class NetworkManagementService {
         network.setMaxRetries(request.getMaxRetries());
         network.setRequestMapping(request.getRequestMapping());
         network.setResponseMapping(request.getResponseMapping());
+        network.setConnectionInstruction(request.getConnectionInstruction());
         
         network = neuralNetworkRepository.save(network);
         return toDTO(network);
@@ -137,6 +139,7 @@ public class NetworkManagementService {
         dto.setMaxRetries(network.getMaxRetries());
         dto.setRequestMapping(network.getRequestMapping());
         dto.setResponseMapping(network.getResponseMapping());
+        dto.setConnectionInstruction(network.getConnectionInstruction());
         dto.setCreatedAt(network.getCreatedAt());
         dto.setUpdatedAt(network.getUpdatedAt());
         return dto;

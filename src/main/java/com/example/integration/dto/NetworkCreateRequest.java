@@ -58,5 +58,8 @@ public class NetworkCreateRequest {
     
     @Schema(description = "Маппинг полей ответа (JSON)", example = "{}")
     private Map<String, Object> responseMapping;
+    
+    @Schema(description = "Подробная инструкция по подключению с эндпоинтами и ответами", example = "Для подключения используйте...")
+    private String connectionInstruction;
 }
 

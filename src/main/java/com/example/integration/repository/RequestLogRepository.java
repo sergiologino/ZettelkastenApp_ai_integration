@@ -38,5 +38,22 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID> {
     
     @Query("SELECT SUM(rl.tokensUsed) FROM RequestLog rl WHERE rl.tokensUsed IS NOT NULL")
     Long sumTokensUsed();
+    
+    // Статистика по клиенту и нейросети
+    @Query("SELECT COUNT(rl) FROM RequestLog rl WHERE rl.clientApp.id = :clientId AND rl.neuralNetwork.id = :networkId")
+    Long countByClientAndNetwork(UUID clientId, UUID networkId);
+    
+    @Query("SELECT COUNT(rl) FROM RequestLog rl WHERE rl.clientApp.id = :clientId AND rl.neuralNetwork.id = :networkId AND rl.status = 'success'")
+    Long countSuccessfulByClientAndNetwork(UUID clientId, UUID networkId);
+    
+    @Query("SELECT COUNT(rl) FROM RequestLog rl WHERE rl.clientApp.id = :clientId AND rl.neuralNetwork.id = :networkId AND rl.status = 'failed'")
+    Long countFailedByClientAndNetwork(UUID clientId, UUID networkId);
+    
+    @Query("SELECT COALESCE(SUM(rl.tokensUsed), 0) FROM RequestLog rl WHERE rl.clientApp.id = :clientId AND rl.neuralNetwork.id = :networkId AND rl.tokensUsed IS NOT NULL")
+    Long sumTokensByClientAndNetwork(UUID clientId, UUID networkId);
+    
+    // Статистика по клиенту (все нейросети) - только для сетей, которые не NULL
+    @Query("SELECT rl.neuralNetwork.id, COUNT(rl) FROM RequestLog rl WHERE rl.clientApp.id = :clientId AND rl.neuralNetwork IS NOT NULL GROUP BY rl.neuralNetwork.id")
+    List<Object[]> countByClientGroupedByNetwork(UUID clientId);
 }
 
