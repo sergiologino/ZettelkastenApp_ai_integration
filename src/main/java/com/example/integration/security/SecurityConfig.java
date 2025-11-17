@@ -74,17 +74,18 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/user/auth/register").permitAll()
                 .requestMatchers("/api/user/auth/login").permitAll()
+                .requestMatchers("/api/user/auth/oauth2/authorize/**").permitAll()
+                .requestMatchers("/api/user/auth/oauth2/callback/**").permitAll()
                 .requestMatchers("/api/user/auth/oauth2/**").permitAll()
                 .requestMatchers("/api/user/auth/**").permitAll()
                 .requestMatchers("/login/**").permitAll()
                 // Админские endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // Пользовательский кабинет - только специфичные пути (auth уже обработан выше)
+                // НЕ используем общее правило /api/user/** чтобы избежать конфликтов с /api/user/auth/**
                 .requestMatchers("/api/user/clients/**").hasRole("USER")
                 .requestMatchers("/api/user/networks/**").hasRole("USER")
-                // Остальные /api/user/** (кроме /api/user/auth/**) требуют роль USER
-                // Но это правило не должно перехватывать /api/user/auth/** благодаря порядку выше
-                .requestMatchers("/api/user/**").hasRole("USER")
+                // Если появятся новые пути в /api/user/, добавляйте их здесь явно
                 // Клиентские AI endpoints требуют X-API-Key (авторизацию настраивает ApiKeyAuthFilter)
                 .requestMatchers("/api/ai/**").authenticated()
                 // Все остальное запрещено

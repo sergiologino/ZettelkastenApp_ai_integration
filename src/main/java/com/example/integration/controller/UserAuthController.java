@@ -78,7 +78,16 @@ public class UserAuthController {
 
     @GetMapping("/oauth2/authorize/{provider}")
     public ResponseEntity<?> oauthAuthorize(@PathVariable("provider") String provider) {
-        String state = userService.createOAuthState();
+        String redirectUri;
+        if ("google".equalsIgnoreCase(provider)) {
+            redirectUri = googleRedirectUri;
+        } else if ("yandex".equalsIgnoreCase(provider)) {
+            redirectUri = yandexRedirectUri;
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("error", "Неизвестный провайдер"));
+        }
+        
+        String state = userService.createOAuthState(provider.toLowerCase(), redirectUri);
         String redirectUrl;
         if ("google".equalsIgnoreCase(provider)) {
             String url = "https://accounts.google.com/o/oauth2/v2/auth" +
@@ -89,15 +98,13 @@ public class UserAuthController {
                     "&state=" + urlEnc(state) +
                     "&access_type=online";
             redirectUrl = url;
-        } else if ("yandex".equalsIgnoreCase(provider)) {
+        } else {
             String url = "https://oauth.yandex.ru/authorize" +
                     "?response_type=code" +
                     "&client_id=" + urlEnc(yandexClientId) +
                     "&redirect_uri=" + urlEnc(yandexRedirectUri) +
                     "&state=" + urlEnc(state);
             redirectUrl = url;
-        } else {
-            return ResponseEntity.badRequest().body(Map.of("error", "Неизвестный провайдер"));
         }
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(redirectUrl));

@@ -73,9 +73,9 @@ public class UserService {
         return new UserAuthResponse(token, user.getId(), user.getEmail(), user.getFullName());
     }
 
-    public String createOAuthState() {
+    public String createOAuthState(String provider, String redirectUri) {
         String state = UUID.randomUUID().toString();
-        OAuthState st = new OAuthState(UUID.randomUUID(), state);
+        OAuthState st = new OAuthState(UUID.randomUUID(), state, provider, redirectUri);
         oAuthStateRepository.save(st);
         return state;
     }
