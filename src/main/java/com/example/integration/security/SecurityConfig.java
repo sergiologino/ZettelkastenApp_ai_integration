@@ -63,18 +63,27 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Preflight
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Публичные endpoints
+                // Публичные endpoints (должны быть ПЕРЕД более общими правилами)
                 .requestMatchers(
                     "/actuator/**",
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()
+                // Auth endpoints - КРИТИЧНО: должны быть публичными и проверяться ДО /api/user/**
+                // Используем явные пути для избежания конфликтов
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/user/auth/register").permitAll()
+                .requestMatchers("/api/user/auth/login").permitAll()
+                .requestMatchers("/api/user/auth/oauth2/**").permitAll()
                 .requestMatchers("/api/user/auth/**").permitAll()
                 .requestMatchers("/login/**").permitAll()
                 // Админские endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                // Пользовательский кабинет
+                // Пользовательский кабинет - только специфичные пути (auth уже обработан выше)
+                .requestMatchers("/api/user/clients/**").hasRole("USER")
+                .requestMatchers("/api/user/networks/**").hasRole("USER")
+                // Остальные /api/user/** (кроме /api/user/auth/**) требуют роль USER
+                // Но это правило не должно перехватывать /api/user/auth/** благодаря порядку выше
                 .requestMatchers("/api/user/**").hasRole("USER")
                 // Клиентские AI endpoints требуют X-API-Key (авторизацию настраивает ApiKeyAuthFilter)
                 .requestMatchers("/api/ai/**").authenticated()
@@ -83,6 +92,7 @@ public class SecurityConfig {
             );
         
         log.warn("✅ SecurityFilterChain настроен - JWT и API Key фильтры включены");
+        log.warn("🔓 Публичные эндпоинты: /api/auth/**, /api/user/auth/**, /login/**");
         return http.build();
     }
     @Bean
