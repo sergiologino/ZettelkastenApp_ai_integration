@@ -6,6 +6,8 @@ import com.example.integration.service.OAuthService;
 import com.example.integration.service.OAuthService.GoogleUserInfo;
 import com.example.integration.service.OAuthService.YandexUserInfo;
 import com.example.integration.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -19,6 +21,8 @@ import java.nio.charset.StandardCharsets;
 @RestController
 public class OAuthCallbackController {
 
+    private static final Logger log = LoggerFactory.getLogger(OAuthCallbackController.class);
+    
     private final UserService userService;
     private final OAuthService oAuthService;
     private final JwtUtil jwtUtil;
@@ -37,6 +41,7 @@ public class OAuthCallbackController {
     public ResponseEntity<?> oauthCallback(@PathVariable("provider") String provider,
                                             @RequestParam(name = "code", required = false) String code,
                                             @RequestParam(name = "state", required = false) String state) {
+        log.info("🔐 OAuth callback получен: provider={}, code={}, state={}", provider, code != null ? "present" : "null", state != null ? "present" : "null");
         if (code == null || state == null) {
             String redirectTo = oauthFrontendBase + "/auth?ok=0&error=" + urlEnc("code/state не переданы");
             HttpHeaders headers = new HttpHeaders();

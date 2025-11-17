@@ -10,6 +10,7 @@ import com.example.integration.repository.UserAccountRepository;
 import com.example.integration.security.JwtUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.Objects;
@@ -80,6 +81,7 @@ public class UserService {
         return state;
     }
 
+    @Transactional
     public boolean validateAndConsumeState(String state) {
         Optional<OAuthState> st = oAuthStateRepository.findByState(state);
         if (st.isEmpty()) {

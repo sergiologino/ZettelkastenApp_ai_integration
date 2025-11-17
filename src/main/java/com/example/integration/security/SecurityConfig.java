@@ -78,6 +78,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/user/auth/oauth2/callback/**").permitAll()
                 .requestMatchers("/api/user/auth/oauth2/**").permitAll()
                 .requestMatchers("/api/user/auth/**").permitAll()
+                // OAuth callback от провайдеров (Google/Yandex редиректят сюда)
+                .requestMatchers("/login/oauth2/code/**").permitAll()
                 .requestMatchers("/login/**").permitAll()
                 // Админские endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
