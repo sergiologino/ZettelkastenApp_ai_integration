@@ -36,6 +36,8 @@ public class AiOrchestrationService {
     private final ClientApplicationRepository clientAppRepository;
     private final NetworkAccessService networkAccessService;
     private final SubscriptionLimitService subscriptionLimitService;
+    private final UserApiKeyService userApiKeyService;
+    private final com.example.integration.repository.UserClientLinkRepository userClientLinkRepository;
     
     @Value("${ai.enable-fallback:true}")
     private boolean enableFallback;
@@ -48,7 +50,9 @@ public class AiOrchestrationService {
         RequestLogRepository requestLogRepository,
         ClientApplicationRepository clientAppRepository,
         NetworkAccessService networkAccessService,
-        SubscriptionLimitService subscriptionLimitService
+        SubscriptionLimitService subscriptionLimitService,
+        UserApiKeyService userApiKeyService,
+        com.example.integration.repository.UserClientLinkRepository userClientLinkRepository
     ) {
         this.clientFactory = clientFactory;
         this.rateLimitService = rateLimitService;
@@ -58,6 +62,8 @@ public class AiOrchestrationService {
         this.clientAppRepository = clientAppRepository;
         this.networkAccessService = networkAccessService;
         this.subscriptionLimitService = subscriptionLimitService;
+        this.userApiKeyService = userApiKeyService;
+        this.userClientLinkRepository = userClientLinkRepository;
     }
     
     /**
@@ -94,23 +100,47 @@ public class AiOrchestrationService {
         RequestLog requestLog = createRequestLog(clientApp, user, network, request);
         
         try {
+            // 3.5. Получить пользовательский API ключ (если есть)
+            Optional<String> userApiKey = Optional.empty();
+            try {
+                // Пытаемся найти владельца клиента через UserClientLink
+                Optional<com.example.integration.model.UserClientLink> linkOpt = 
+                    userClientLinkRepository.findByClientApplication(clientApp.getId());
+                if (linkOpt.isPresent()) {
+                    com.example.integration.model.UserAccount owner = linkOpt.get().getUser();
+                    userApiKey = userApiKeyService.getApiKey(owner, clientApp.getId(), network.getId());
+                }
+            } catch (Exception e) {
+                // Если не удалось получить пользовательский ключ, используем системный
+                log.debug("Не удалось получить пользовательский API ключ: {}", e.getMessage());
+            }
+            
             // 4. Отправить запрос в нейросеть
             BaseNeuralClient client = clientFactory.getClient(network);
-            Map<String, Object> response = client.sendRequest(network, request.getPayload());
-            
-            // 5. Извлечь количество токенов
-            Integer tokensUsed = extractTokensFromResponse(response);
-            
-            // 6. Обновить счётчик использования
-            rateLimitService.recordUsage(user, network, tokensUsed);
-            
-            // 7. Обновить лог
-            int executionTime = (int) (System.currentTimeMillis() - startTime);
-            requestLog.markCompleted("success", response, executionTime, tokensUsed);
-            requestLogRepository.save(requestLog);
-            
-            // 8. Сформировать ответ
-            return buildResponse(requestLog.getId().toString(), network, response, tokensUsed, executionTime, user);
+            // Устанавливаем пользовательский ключ в ThreadLocal, если он есть
+            try {
+                if (userApiKey.isPresent()) {
+                    BaseNeuralClient.setUserApiKey(userApiKey.get());
+                }
+                Map<String, Object> response = client.sendRequest(network, request.getPayload());
+                
+                // 5. Извлечь количество токенов
+                Integer tokensUsed = extractTokensFromResponse(response);
+                
+                // 6. Обновить счётчик использования
+                rateLimitService.recordUsage(user, network, tokensUsed);
+                
+                // 7. Обновить лог
+                int executionTime = (int) (System.currentTimeMillis() - startTime);
+                requestLog.markCompleted("success", response, executionTime, tokensUsed);
+                requestLogRepository.save(requestLog);
+                
+                // 8. Сформировать ответ
+                return buildResponse(requestLog.getId().toString(), network, response, tokensUsed, executionTime, user);
+            } finally {
+                // Очищаем пользовательский ключ из ThreadLocal
+                BaseNeuralClient.clearUserApiKey();
+            }
             
         } catch (Exception e) {
             log.error("Error processing AI request", e);

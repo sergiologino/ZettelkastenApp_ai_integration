@@ -88,6 +88,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/user/clients/**").hasRole("USER")
                 .requestMatchers("/api/user/networks/**").hasRole("USER")
                 .requestMatchers("/api/user/subscriptions/**").hasRole("USER")
+                .requestMatchers("/api/user/api-keys/**").hasRole("USER")
                 // Webhook от платежных провайдеров (публичный, но должен быть защищен на уровне провайдера)
                 .requestMatchers("/api/payments/webhook/**").permitAll()
                 // Если появятся новые пути в /api/user/, добавляйте их здесь явно
