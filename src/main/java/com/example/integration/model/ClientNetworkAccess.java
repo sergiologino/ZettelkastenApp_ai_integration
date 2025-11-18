@@ -32,6 +32,9 @@ public class ClientNetworkAccess {
     
     @Column(name = "free_request_limit")
     private Integer freeRequestLimit; // Лимит бесплатных запросов для бесплатного плана
+    
+    @Column(name = "priority")
+    private Integer priority = 100; // Приоритет нейросети (меньше = выше приоритет)
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -105,6 +108,14 @@ public class ClientNetworkAccess {
     
     public void setFreeRequestLimit(Integer freeRequestLimit) {
         this.freeRequestLimit = freeRequestLimit;
+    }
+    
+    public Integer getPriority() {
+        return priority;
+    }
+    
+    public void setPriority(Integer priority) {
+        this.priority = priority;
     }
 
     public LocalDateTime getCreatedAt() {

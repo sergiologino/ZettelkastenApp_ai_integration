@@ -109,13 +109,37 @@ public class UserClientController {
         return userContextService.resolveCurrentUser(request)
                 .<ResponseEntity<?>>map(user -> {
                     try {
-                        if (req.getNetworkIds() == null) {
-                            return ResponseEntity.badRequest().body(Map.of("error", "networkIds обязателен"));
+                        // Поддерживаем оба формата: старый (networkIds) и новый (networks с приоритетами)
+                        if (req.getNetworks() != null && !req.getNetworks().isEmpty()) {
+                            // Новый формат с приоритетами
+                            userClientService.setClientNetworksWithPriority(user, id, req.getNetworks());
+                        } else if (req.getNetworkIds() != null && !req.getNetworkIds().isEmpty()) {
+                            // Старый формат для обратной совместимости
+                            userClientService.setClientNetworks(user, id, req.getNetworkIds());
+                        } else {
+                            return ResponseEntity.badRequest().body(Map.of("error", "networkIds или networks обязателен"));
                         }
-                        userClientService.setClientNetworks(user, id, req.getNetworkIds());
                         return ResponseEntity.noContent().build();
                     } catch (IllegalArgumentException ex) {
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+                    }
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+    }
+
+    /**
+     * Получить список подключенных нейросетей для клиента с приоритетами
+     */
+    @GetMapping("/clients/{id}/networks")
+    public ResponseEntity<?> getClientNetworks(HttpServletRequest request, @PathVariable("id") UUID id) {
+        return userContextService.resolveCurrentUser(request)
+                .<ResponseEntity<?>>map(user -> {
+                    try {
+                        List<com.example.integration.dto.user.ClientNetworkAccessDto> networks = 
+                            userClientService.getClientNetworksWithPriority(user, id);
+                        return ResponseEntity.ok(networks);
+                    } catch (IllegalArgumentException ex) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
                     }
                 })
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());

@@ -9,6 +9,7 @@ import java.util.UUID;
  */
 @Data
 public class SetClientNetworksRequest {
-    private List<UUID> networkIds;
+    private List<UUID> networkIds; // Для обратной совместимости
+    private List<NetworkWithPriority> networks; // Новый формат с приоритетами
 }
 

@@ -140,11 +140,53 @@ public class UserClientService {
                 .map(this::toAvailableNetworkDto)
                 .collect(Collectors.toList());
     }
+    
+    /**
+     * Получить список подключенных нейросетей для клиента с приоритетами
+     */
+    public List<com.example.integration.dto.user.ClientNetworkAccessDto> getClientNetworksWithPriority(UserAccount user, UUID clientId) {
+        ClientApplication client = ensureOwned(user, clientId)
+                .orElseThrow(() -> new IllegalArgumentException("Клиент не найден или недоступен"));
+        
+        List<ClientNetworkAccess> accesses = clientNetworkAccessRepository
+                .findByClientApplicationOrderByPriorityAsc(client);
+        
+        return accesses.stream()
+                .map(access -> {
+                    NeuralNetwork network = access.getNeuralNetwork();
+                    com.example.integration.dto.user.ClientNetworkAccessDto dto = new com.example.integration.dto.user.ClientNetworkAccessDto();
+                    dto.setNetworkId(network.getId());
+                    dto.setNetworkName(network.getName());
+                    dto.setNetworkDisplayName(network.getDisplayName());
+                    dto.setProvider(network.getProvider());
+                    dto.setNetworkType(network.getNetworkType());
+                    dto.setPriority(access.getPriority() != null ? access.getPriority() : 100);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
 
     /**
      * Сохранить список подключенных нейросетей для клиента
      */
     public void setClientNetworks(UserAccount user, UUID clientId, List<UUID> networkIds) {
+        // Для обратной совместимости - преобразуем в формат с приоритетами
+        List<com.example.integration.dto.user.NetworkWithPriority> networks = networkIds.stream()
+                .map(networkId -> {
+                    com.example.integration.dto.user.NetworkWithPriority nwp = new com.example.integration.dto.user.NetworkWithPriority();
+                    nwp.setNetworkId(networkId);
+                    nwp.setPriority(100); // По умолчанию
+                    return nwp;
+                })
+                .collect(java.util.stream.Collectors.toList());
+        setClientNetworksWithPriority(user, clientId, networks);
+    }
+    
+    /**
+     * Сохранить список подключенных нейросетей для клиента с приоритетами
+     */
+    public void setClientNetworksWithPriority(UserAccount user, UUID clientId, 
+                                             List<com.example.integration.dto.user.NetworkWithPriority> networks) {
         // Проверяем, что клиент принадлежит пользователю
         ClientApplication client = ensureOwned(user, clientId)
                 .orElseThrow(() -> new IllegalArgumentException("Клиент не найден или недоступен"));
@@ -156,10 +198,10 @@ public class UserClientService {
         // Удаляем все текущие подключения
         clientNetworkAccessRepository.deleteAll(currentAccesses);
         
-        // Создаем новые подключения для выбранных сетей
-        for (UUID networkId : networkIds) {
-            NeuralNetwork network = neuralNetworkRepository.findById(networkId)
-                    .orElseThrow(() -> new IllegalArgumentException("Нейросеть не найдена: " + networkId));
+        // Создаем новые подключения для выбранных сетей с приоритетами
+        for (com.example.integration.dto.user.NetworkWithPriority nwp : networks) {
+            NeuralNetwork network = neuralNetworkRepository.findById(nwp.getNetworkId())
+                    .orElseThrow(() -> new IllegalArgumentException("Нейросеть не найдена: " + nwp.getNetworkId()));
             
             // Проверяем, что сеть активна
             if (!network.getIsActive()) {
@@ -167,6 +209,7 @@ public class UserClientService {
             }
             
             ClientNetworkAccess access = new ClientNetworkAccess(client, network);
+            access.setPriority(nwp.getPriority() != null ? nwp.getPriority() : 100);
             clientNetworkAccessRepository.save(access);
         }
     }
