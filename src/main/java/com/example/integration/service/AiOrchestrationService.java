@@ -35,6 +35,7 @@ public class AiOrchestrationService {
     private final RequestLogRepository requestLogRepository;
     private final ClientApplicationRepository clientAppRepository;
     private final NetworkAccessService networkAccessService;
+    private final SubscriptionLimitService subscriptionLimitService;
     
     @Value("${ai.enable-fallback:true}")
     private boolean enableFallback;
@@ -46,7 +47,8 @@ public class AiOrchestrationService {
         ExternalUserRepository externalUserRepository,
         RequestLogRepository requestLogRepository,
         ClientApplicationRepository clientAppRepository,
-        NetworkAccessService networkAccessService
+        NetworkAccessService networkAccessService,
+        SubscriptionLimitService subscriptionLimitService
     ) {
         this.clientFactory = clientFactory;
         this.rateLimitService = rateLimitService;
@@ -55,6 +57,7 @@ public class AiOrchestrationService {
         this.requestLogRepository = requestLogRepository;
         this.clientAppRepository = clientAppRepository;
         this.networkAccessService = networkAccessService;
+        this.subscriptionLimitService = subscriptionLimitService;
     }
     
     /**
@@ -69,6 +72,23 @@ public class AiOrchestrationService {
         
         // 2. Выбрать нейросеть
         NeuralNetwork network = selectNetwork(request.getNetworkName(), request.getRequestType(), user);
+        
+        // 2.5. Проверить лимиты подписки
+        String limitError = subscriptionLimitService.checkRequestLimit(clientApp, network);
+        if (limitError != null) {
+            // Создаем лог с ошибкой лимита
+            RequestLog requestLog = createRequestLog(clientApp, user, network, request);
+            requestLog.markFailed(limitError, 0);
+            requestLogRepository.save(requestLog);
+            
+            // Возвращаем ошибку
+            AiResponseDTO errorResponse = new AiResponseDTO();
+            errorResponse.setRequestId(requestLog.getId().toString());
+            errorResponse.setStatus("failed");
+            errorResponse.setErrorMessage(limitError);
+            errorResponse.setNetworkUsed(network.getName());
+            return errorResponse;
+        }
         
         // 3. Создать лог запроса
         RequestLog requestLog = createRequestLog(clientApp, user, network, request);

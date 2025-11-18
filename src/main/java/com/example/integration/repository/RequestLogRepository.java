@@ -55,5 +55,13 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID> {
     // Статистика по клиенту (все нейросети) - только для сетей, которые не NULL
     @Query("SELECT rl.neuralNetwork.id, COUNT(rl) FROM RequestLog rl WHERE rl.clientApp.id = :clientId AND rl.neuralNetwork IS NOT NULL GROUP BY rl.neuralNetwork.id")
     List<Object[]> countByClientGroupedByNetwork(UUID clientId);
+    
+    // Подсчет бесплатных запросов (для бесплатного плана)
+    @Query("SELECT COUNT(rl) FROM RequestLog rl WHERE rl.clientApp.id = :clientId AND rl.neuralNetwork.id = :networkId AND rl.status = 'success'")
+    Long countByClientAndNetworkAndFreePlan(UUID clientId, UUID networkId);
+    
+    // Подсчет запросов в диапазоне дат (для дневных/месячных лимитов)
+    @Query("SELECT COUNT(rl) FROM RequestLog rl WHERE rl.clientApp.id = :clientId AND rl.neuralNetwork.id = :networkId AND rl.status = 'success' AND rl.createdAt >= :from AND rl.createdAt <= :to")
+    Long countByClientAndNetworkAndDateRange(UUID clientId, UUID networkId, LocalDateTime from, LocalDateTime to);
 }
 

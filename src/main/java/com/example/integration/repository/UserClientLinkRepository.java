@@ -16,6 +16,13 @@ public interface UserClientLinkRepository extends JpaRepository<UserClientLink, 
 
     @Query("select l from UserClientLink l join fetch l.clientApplication ca where l.user.id = :userId and ca.id = :clientId")
     Optional<UserClientLink> findByUserAndClient(@Param("userId") UUID userId, @Param("clientId") UUID clientId);
+    
+    @Query("select l from UserClientLink l join fetch l.user where l.clientApplication.id = :clientId")
+    Optional<UserClientLink> findByClientApplication(@Param("clientId") UUID clientId);
+    
+    default Optional<UserClientLink> findByClientApplication(com.example.integration.model.ClientApplication clientApp) {
+        return findByClientApplication(clientApp.getId());
+    }
 }
 
 

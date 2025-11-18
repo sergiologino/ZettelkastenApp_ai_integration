@@ -31,6 +31,15 @@ oauth:
     client-id: ${YANDEX_CLIENT_ID:}
     client-secret: ${YANDEX_CLIENT_SECRET:}
     redirect-uri: ${YANDEX_REDIRECT_URI:https://sergiologino-zettelkastenapp-ai-integration-bce3.twc1.net/login/oauth2/code/yandex}
+
+# YooKassa Configuration
+yookassa:
+  shop:
+    id: ${YOOKASSA_SHOP_ID:}
+  secret:
+    key: ${YOOKASSA_SECRET_KEY:}
+  api:
+    url: ${YOOKASSA_API_URL:https://api.yookassa.ru/v3}
     
 server:
   port: ${SERVER_PORT:8091}
