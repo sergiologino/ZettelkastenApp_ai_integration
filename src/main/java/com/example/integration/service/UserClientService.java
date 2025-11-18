@@ -18,7 +18,11 @@ import com.example.integration.repository.UserClientLinkRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -28,28 +32,36 @@ import java.util.stream.Collectors;
 @Service
 public class UserClientService {
 
+    private static final Logger log = LoggerFactory.getLogger(UserClientService.class);
+
     private final ClientApplicationRepository clientApplicationRepository;
     private final UserClientLinkRepository linkRepository;
     private final NeuralNetworkRepository neuralNetworkRepository;
     private final RequestLogRepository requestLogRepository;
     private final ClientNetworkAccessRepository clientNetworkAccessRepository;
+    private final SubscriptionService subscriptionService;
+    private final SubscriptionLimitService subscriptionLimitService;
 
     public UserClientService(ClientApplicationRepository clientApplicationRepository,
                              UserClientLinkRepository linkRepository,
                              NeuralNetworkRepository neuralNetworkRepository,
                              RequestLogRepository requestLogRepository,
-                             ClientNetworkAccessRepository clientNetworkAccessRepository) {
+                             ClientNetworkAccessRepository clientNetworkAccessRepository,
+                             SubscriptionService subscriptionService,
+                             SubscriptionLimitService subscriptionLimitService) {
         this.clientApplicationRepository = clientApplicationRepository;
         this.linkRepository = linkRepository;
         this.neuralNetworkRepository = neuralNetworkRepository;
         this.requestLogRepository = requestLogRepository;
         this.clientNetworkAccessRepository = clientNetworkAccessRepository;
+        this.subscriptionService = subscriptionService;
+        this.subscriptionLimitService = subscriptionLimitService;
     }
 
     public List<ClientApplicationDto> list(UserAccount user) {
         return linkRepository.findActiveByUserId(user.getId())
                 .stream()
-                .map(link -> toDto(link.getClientApplication()))
+                .map(link -> toDto(link.getClientApplication(), user))
                 .collect(Collectors.toList());
     }
 
@@ -91,7 +103,7 @@ public class UserClientService {
             app.setIsActive(req.getIsActive());
         }
         clientApplicationRepository.save(app);
-        return toDto(app);
+        return toDto(app, user);
     }
 
     public void delete(UserAccount user, UUID id) {
@@ -106,10 +118,10 @@ public class UserClientService {
                 .orElseThrow(() -> new IllegalArgumentException("Клиент не найден или недоступен"));
         app.setApiKey(generateApiKey());
         clientApplicationRepository.save(app);
-        return toDto(app);
+        return toDto(app, user);
     }
 
-    private ClientApplicationDto toDto(ClientApplication app) {
+    private ClientApplicationDto toDto(ClientApplication app, UserAccount user) {
         ClientApplicationDto dto = new ClientApplicationDto();
         dto.setId(app.getId());
         dto.setName(app.getName());
@@ -126,9 +138,126 @@ public class UserClientService {
                 .collect(Collectors.toList());
         dto.setNetworkIds(networkIds);
         
+        // Рассчитываем остаток токенов и дней использования
+        calculateTokenRemaining(dto, app, user);
+        
         dto.setCreatedAt(app.getCreatedAt());
         dto.setUpdatedAt(app.getUpdatedAt());
         return dto;
+    }
+    
+    private ClientApplicationDto toDto(ClientApplication app) {
+        // Для обратной совместимости - без расчета токенов
+        ClientApplicationDto dto = new ClientApplicationDto();
+        dto.setId(app.getId());
+        dto.setName(app.getName());
+        dto.setDescription(app.getDescription());
+        dto.setApiKey(app.getApiKey());
+        dto.setIsActive(app.getIsActive());
+        dto.setDeleted(app.getDeleted());
+        
+        List<ClientNetworkAccess> accesses = clientNetworkAccessRepository
+                .findByClientApplicationOrderByNeuralNetworkDisplayNameAsc(app);
+        List<UUID> networkIds = accesses.stream()
+                .map(access -> access.getNeuralNetwork().getId())
+                .collect(Collectors.toList());
+        dto.setNetworkIds(networkIds);
+        
+        dto.setCreatedAt(app.getCreatedAt());
+        dto.setUpdatedAt(app.getUpdatedAt());
+        return dto;
+    }
+    
+    /**
+     * Рассчитать остаток токенов и дней использования для клиента
+     */
+    private void calculateTokenRemaining(ClientApplicationDto dto, ClientApplication app, UserAccount user) {
+        try {
+            // Получаем текущую подписку
+            Optional<com.example.integration.model.Subscription> subscriptionOpt = 
+                    subscriptionService.getCurrentSubscription(user);
+            
+            if (subscriptionOpt.isEmpty()) {
+                dto.setTotalTokensRemaining(0L);
+                dto.setEstimatedDaysRemaining(0);
+                return;
+            }
+            
+            // Получаем все подключенные сети для клиента
+            List<ClientNetworkAccess> accesses = clientNetworkAccessRepository
+                    .findByClientApplicationOrderByNeuralNetworkDisplayNameAsc(app);
+            
+            // Рассчитываем общий остаток токенов из месячных лимитов доступа
+            Long totalTokensRemaining = null;
+            Long totalEstimatedTokensLimit = 0L;
+            
+            // Суммируем месячные лимиты запросов из всех доступов
+            for (ClientNetworkAccess access : accesses) {
+                if (access.getMonthlyRequestLimit() != null && access.getMonthlyRequestLimit() > 0) {
+                    // Примерно 100 токенов на запрос
+                    totalEstimatedTokensLimit += access.getMonthlyRequestLimit() * 100L;
+                }
+            }
+            
+            if (totalEstimatedTokensLimit > 0) {
+                // Подсчитываем использованные токены за текущий месяц
+                Long totalTokensUsed = 0L;
+                for (ClientNetworkAccess access : accesses) {
+                    Long tokensUsed = requestLogRepository.sumTokensByClientAndNetwork(
+                            app.getId(), access.getNeuralNetwork().getId());
+                    if (tokensUsed != null) {
+                        totalTokensUsed += tokensUsed;
+                    }
+                }
+                
+                // Остаток = лимит - использовано
+                totalTokensRemaining = Math.max(0, totalEstimatedTokensLimit - totalTokensUsed);
+            }
+            
+            dto.setTotalTokensRemaining(totalTokensRemaining);
+            
+            // Рассчитываем примерное количество дней
+            if (totalTokensRemaining != null && totalTokensRemaining > 0) {
+                // Подсчитываем средний расход токенов в день за последние 7 дней
+                LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+                LocalDateTime now = LocalDateTime.now();
+                
+                Long tokensUsedLast7Days = 0L;
+                for (ClientNetworkAccess access : accesses) {
+                    // Подсчитываем токены за последние 7 дней
+                    List<com.example.integration.model.RequestLog> recentLogs = requestLogRepository
+                            .findByDateRange(sevenDaysAgo, now, org.springframework.data.domain.PageRequest.of(0, Integer.MAX_VALUE))
+                            .getContent()
+                            .stream()
+                            .filter(log -> log.getClientApp().getId().equals(app.getId()) 
+                                    && log.getNeuralNetwork() != null 
+                                    && log.getNeuralNetwork().getId().equals(access.getNeuralNetwork().getId())
+                                    && log.getTokensUsed() != null)
+                            .collect(Collectors.toList());
+                    
+                    Long tokens = recentLogs.stream()
+                            .mapToLong(log -> log.getTokensUsed() != null ? log.getTokensUsed() : 0L)
+                            .sum();
+                    tokensUsedLast7Days += tokens;
+                }
+                
+                // Средний расход в день
+                double avgTokensPerDay = tokensUsedLast7Days / 7.0;
+                
+                if (avgTokensPerDay > 0) {
+                    int estimatedDays = (int) Math.ceil(totalTokensRemaining / avgTokensPerDay);
+                    dto.setEstimatedDaysRemaining(estimatedDays);
+                } else {
+                    dto.setEstimatedDaysRemaining(null); // Нет данных для расчета
+                }
+            } else {
+                dto.setEstimatedDaysRemaining(0);
+            }
+        } catch (Exception e) {
+            log.error("Ошибка расчета остатка токенов для клиента {}", app.getId(), e);
+            dto.setTotalTokensRemaining(0L);
+            dto.setEstimatedDaysRemaining(0);
+        }
     }
 
     /**

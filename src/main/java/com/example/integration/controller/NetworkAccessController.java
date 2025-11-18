@@ -245,4 +245,27 @@ public class NetworkAccessController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+    
+    /**
+     * Получить доступы, сгруппированные по пользователям: Пользователь → Сервисы → Нейросети
+     */
+    @GetMapping("/grouped")
+    @Operation(summary = "Получить группированные доступы", description = "Получить доступы, сгруппированные по пользователям, сервисам и нейросетям")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Доступы получены успешно"),
+            @ApiResponse(responseCode = "401", description = "Неавторизован"),
+            @ApiResponse(responseCode = "403", description = "Нет прав доступа")
+    })
+    public ResponseEntity<List<com.example.integration.dto.UserAccessGroupDto>> getGroupedAccesses() {
+        log.info("📊 [Admin] Получение группированных доступов");
+        
+        try {
+            List<com.example.integration.dto.UserAccessGroupDto> grouped = networkAccessService.getGroupedAccesses();
+            log.info("✅ [Admin] Получено {} групп пользователей", grouped.size());
+            return ResponseEntity.ok(grouped);
+        } catch (Exception e) {
+            log.error("❌ [Admin] Ошибка получения группированных доступов", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }

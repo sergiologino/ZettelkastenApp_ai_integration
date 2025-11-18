@@ -5,18 +5,20 @@ import com.example.integration.dto.GrantAccessRequest;
 import com.example.integration.model.ClientApplication;
 import com.example.integration.model.ClientNetworkAccess;
 import com.example.integration.model.NeuralNetwork;
+import com.example.integration.dto.UserAccessGroupDto;
+import com.example.integration.model.UserAccount;
 import com.example.integration.repository.ClientApplicationRepository;
 import com.example.integration.repository.ClientNetworkAccessRepository;
 import com.example.integration.repository.NeuralNetworkRepository;
+import com.example.integration.repository.UserAccountRepository;
+import com.example.integration.repository.UserClientLinkRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -31,14 +33,20 @@ public class NetworkAccessService {
     private final ClientNetworkAccessRepository clientNetworkAccessRepository;
     private final ClientApplicationRepository clientApplicationRepository;
     private final NeuralNetworkRepository neuralNetworkRepository;
+    private final UserClientLinkRepository userClientLinkRepository;
+    private final UserAccountRepository userAccountRepository;
 
     @Autowired
     public NetworkAccessService(ClientNetworkAccessRepository clientNetworkAccessRepository,
                                ClientApplicationRepository clientApplicationRepository,
-                               NeuralNetworkRepository neuralNetworkRepository) {
+                               NeuralNetworkRepository neuralNetworkRepository,
+                               UserClientLinkRepository userClientLinkRepository,
+                               UserAccountRepository userAccountRepository) {
         this.clientNetworkAccessRepository = clientNetworkAccessRepository;
         this.clientApplicationRepository = clientApplicationRepository;
         this.neuralNetworkRepository = neuralNetworkRepository;
+        this.userClientLinkRepository = userClientLinkRepository;
+        this.userAccountRepository = userAccountRepository;
     }
 
     /**
@@ -214,6 +222,165 @@ public class NetworkAccessService {
         long unlimitedAccesses = clientNetworkAccessRepository.findWithoutLimits().size();
 
         return new AccessStats(totalAccesses, accessesWithLimits, unlimitedAccesses);
+    }
+    
+    /**
+     * Получить доступы, сгруппированные по пользователям: Пользователь → Сервисы → Нейросети
+     */
+    @Transactional(readOnly = true)
+    public List<UserAccessGroupDto> getGroupedAccesses() {
+        log.info("Получаем доступы, сгруппированные по пользователям");
+        
+        // Получаем все доступы
+        List<ClientNetworkAccess> allAccesses = clientNetworkAccessRepository.findAll();
+        
+        // Группируем по клиентам
+        Map<UUID, List<ClientNetworkAccess>> accessesByClient = allAccesses.stream()
+                .collect(Collectors.groupingBy(access -> access.getClientApplication().getId()));
+        
+        // Создаем карту: clientId -> userId (если есть)
+        Map<UUID, UUID> clientToUserMap = new HashMap<>();
+        Map<UUID, UserAccount> userMap = new HashMap<>();
+        
+        // Заполняем карту связей клиент-пользователь
+        for (UUID clientId : accessesByClient.keySet()) {
+            userClientLinkRepository.findByClientApplication(clientId)
+                    .ifPresent(link -> {
+                        clientToUserMap.put(clientId, link.getUser().getId());
+                        userMap.put(link.getUser().getId(), link.getUser());
+                    });
+        }
+        
+        // Группируем по пользователям
+        Map<UUID, Map<UUID, List<ClientNetworkAccess>>> userClientAccessMap = new HashMap<>();
+        
+        // Добавляем админские сервисы (без пользователя)
+        UUID adminUserId = null; // null означает админские сервисы
+        
+        for (Map.Entry<UUID, List<ClientNetworkAccess>> entry : accessesByClient.entrySet()) {
+            UUID clientId = entry.getKey();
+            UUID userId = clientToUserMap.get(clientId);
+            
+            if (userId == null) {
+                // Админский сервис
+                userClientAccessMap.computeIfAbsent(adminUserId, k -> new HashMap<>())
+                        .put(clientId, entry.getValue());
+            } else {
+                // Сервис пользователя
+                userClientAccessMap.computeIfAbsent(userId, k -> new HashMap<>())
+                        .put(clientId, entry.getValue());
+            }
+        }
+        
+        // Создаем результат
+        List<UserAccessGroupDto> result = new ArrayList<>();
+        
+        // Обрабатываем пользователей
+        for (Map.Entry<UUID, Map<UUID, List<ClientNetworkAccess>>> userEntry : userClientAccessMap.entrySet()) {
+            UUID userId = userEntry.getKey();
+            
+            if (userId == null) {
+                // Админские сервисы - создаем специальную группу
+                UserAccessGroupDto adminGroup = new UserAccessGroupDto();
+                adminGroup.setUserId(null);
+                adminGroup.setUserEmail("Администратор");
+                adminGroup.setUserFullName("Администратор");
+                
+                List<UserAccessGroupDto.ClientServiceDto> adminServices = new ArrayList<>();
+                for (Map.Entry<UUID, List<ClientNetworkAccess>> clientEntry : userEntry.getValue().entrySet()) {
+                    UUID clientId = clientEntry.getKey();
+                    ClientApplication client = clientApplicationRepository.findById(clientId).orElse(null);
+                    if (client == null) continue;
+                    
+                    UserAccessGroupDto.ClientServiceDto serviceDto = new UserAccessGroupDto.ClientServiceDto();
+                    serviceDto.setClientId(clientId);
+                    serviceDto.setClientName(client.getName());
+                    serviceDto.setClientDescription(client.getDescription());
+                    serviceDto.setIsAdminService(true);
+                    
+                    List<UserAccessGroupDto.NetworkAccessInfoDto> networks = clientEntry.getValue().stream()
+                            .map(access -> {
+                                UserAccessGroupDto.NetworkAccessInfoDto networkDto = new UserAccessGroupDto.NetworkAccessInfoDto();
+                                networkDto.setAccessId(access.getId());
+                                networkDto.setNetworkId(access.getNeuralNetwork().getId());
+                                networkDto.setNetworkDisplayName(access.getNeuralNetwork().getDisplayName());
+                                networkDto.setNetworkProvider(access.getNeuralNetwork().getProvider());
+                                networkDto.setNetworkType(access.getNeuralNetwork().getNetworkType());
+                                networkDto.setDailyRequestLimit(access.getDailyRequestLimit());
+                                networkDto.setMonthlyRequestLimit(access.getMonthlyRequestLimit());
+                                networkDto.setPriority(access.getPriority());
+                                return networkDto;
+                            })
+                            .sorted(Comparator.comparing(UserAccessGroupDto.NetworkAccessInfoDto::getPriority, 
+                                    Comparator.nullsLast(Comparator.naturalOrder())))
+                            .collect(Collectors.toList());
+                    
+                    serviceDto.setNetworks(networks);
+                    adminServices.add(serviceDto);
+                }
+                
+                adminGroup.setServices(adminServices);
+                result.add(adminGroup);
+            } else {
+                // Сервисы пользователя
+                UserAccount user = userMap.get(userId);
+                if (user == null) {
+                    user = userAccountRepository.findById(userId).orElse(null);
+                    if (user == null) continue;
+                }
+                
+                UserAccessGroupDto userGroup = new UserAccessGroupDto();
+                userGroup.setUserId(userId);
+                userGroup.setUserEmail(user.getEmail());
+                userGroup.setUserFullName(user.getFullName());
+                
+                List<UserAccessGroupDto.ClientServiceDto> userServices = new ArrayList<>();
+                for (Map.Entry<UUID, List<ClientNetworkAccess>> clientEntry : userEntry.getValue().entrySet()) {
+                    UUID clientId = clientEntry.getKey();
+                    ClientApplication client = clientApplicationRepository.findById(clientId).orElse(null);
+                    if (client == null) continue;
+                    
+                    UserAccessGroupDto.ClientServiceDto serviceDto = new UserAccessGroupDto.ClientServiceDto();
+                    serviceDto.setClientId(clientId);
+                    serviceDto.setClientName(client.getName());
+                    serviceDto.setClientDescription(client.getDescription());
+                    serviceDto.setIsAdminService(false);
+                    
+                    List<UserAccessGroupDto.NetworkAccessInfoDto> networks = clientEntry.getValue().stream()
+                            .map(access -> {
+                                UserAccessGroupDto.NetworkAccessInfoDto networkDto = new UserAccessGroupDto.NetworkAccessInfoDto();
+                                networkDto.setAccessId(access.getId());
+                                networkDto.setNetworkId(access.getNeuralNetwork().getId());
+                                networkDto.setNetworkDisplayName(access.getNeuralNetwork().getDisplayName());
+                                networkDto.setNetworkProvider(access.getNeuralNetwork().getProvider());
+                                networkDto.setNetworkType(access.getNeuralNetwork().getNetworkType());
+                                networkDto.setDailyRequestLimit(access.getDailyRequestLimit());
+                                networkDto.setMonthlyRequestLimit(access.getMonthlyRequestLimit());
+                                networkDto.setPriority(access.getPriority());
+                                return networkDto;
+                            })
+                            .sorted(Comparator.comparing(UserAccessGroupDto.NetworkAccessInfoDto::getPriority, 
+                                    Comparator.nullsLast(Comparator.naturalOrder())))
+                            .collect(Collectors.toList());
+                    
+                    serviceDto.setNetworks(networks);
+                    userServices.add(serviceDto);
+                }
+                
+                userGroup.setServices(userServices);
+                result.add(userGroup);
+            }
+        }
+        
+        // Сортируем: сначала админские, потом пользователи по email
+        result.sort((a, b) -> {
+            if (a.getUserId() == null && b.getUserId() != null) return -1;
+            if (a.getUserId() != null && b.getUserId() == null) return 1;
+            if (a.getUserId() == null && b.getUserId() == null) return 0;
+            return a.getUserEmail().compareToIgnoreCase(b.getUserEmail());
+        });
+        
+        return result;
     }
 
     /**

@@ -12,6 +12,8 @@ public class ClientApplicationDto {
     private Boolean isActive;
     private Boolean deleted;
     private List<UUID> networkIds;
+    private Long totalTokensRemaining; // Общий остаток токенов (из лимитов подписки)
+    private Integer estimatedDaysRemaining; // Примерное количество дней на сколько хватит токенов
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -33,6 +35,10 @@ public class ClientApplicationDto {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public List<UUID> getNetworkIds() { return networkIds; }
     public void setNetworkIds(List<UUID> networkIds) { this.networkIds = networkIds; }
+    public Long getTotalTokensRemaining() { return totalTokensRemaining; }
+    public void setTotalTokensRemaining(Long totalTokensRemaining) { this.totalTokensRemaining = totalTokensRemaining; }
+    public Integer getEstimatedDaysRemaining() { return estimatedDaysRemaining; }
+    public void setEstimatedDaysRemaining(Integer estimatedDaysRemaining) { this.estimatedDaysRemaining = estimatedDaysRemaining; }
 }
 
 

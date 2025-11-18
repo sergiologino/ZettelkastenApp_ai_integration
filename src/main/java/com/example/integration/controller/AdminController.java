@@ -38,19 +38,22 @@ public class AdminController {
     private final RequestLogRepository requestLogRepository;
     private final com.example.integration.repository.NeuralNetworkRepository neuralNetworkRepository;
     private final com.example.integration.repository.ClientApplicationRepository clientApplicationRepository;
+    private final com.example.integration.repository.PaymentHistoryRepository paymentHistoryRepository;
     
     public AdminController(
         NetworkManagementService networkService,
         ClientManagementService clientService,
         RequestLogRepository requestLogRepository,
         com.example.integration.repository.NeuralNetworkRepository neuralNetworkRepository,
-        com.example.integration.repository.ClientApplicationRepository clientApplicationRepository
+        com.example.integration.repository.ClientApplicationRepository clientApplicationRepository,
+        com.example.integration.repository.PaymentHistoryRepository paymentHistoryRepository
     ) {
         this.networkService = networkService;
         this.clientService = clientService;
         this.requestLogRepository = requestLogRepository;
         this.neuralNetworkRepository = neuralNetworkRepository;
         this.clientApplicationRepository = clientApplicationRepository;
+        this.paymentHistoryRepository = paymentHistoryRepository;
     }
     
     // ==================== Neural Networks ====================
@@ -450,6 +453,39 @@ public class AdminController {
             networkDetails,
             clientDetails
         );
+        
+        return ResponseEntity.ok(stats);
+    }
+    
+    /**
+     * Получить статистику оплат от пользователей
+     */
+    @GetMapping("/payments/stats")
+    @Operation(summary = "Get payment statistics", description = "Get all payments from users with dates and amounts")
+    public ResponseEntity<List<com.example.integration.dto.PaymentStatsDto>> getPaymentStats() {
+        log.info("Получение статистики оплат");
+        
+        List<com.example.integration.model.PaymentHistory> payments = paymentHistoryRepository.findAll();
+        
+        List<com.example.integration.dto.PaymentStatsDto> stats = payments.stream()
+                .map(payment -> {
+                    com.example.integration.dto.PaymentStatsDto dto = new com.example.integration.dto.PaymentStatsDto();
+                    dto.setPaymentId(payment.getId());
+                    dto.setUserId(payment.getUserAccount().getId());
+                    dto.setUserEmail(payment.getUserAccount().getEmail());
+                    dto.setUserFullName(payment.getUserAccount().getFullName());
+                    dto.setPlanName(payment.getSubscriptionPlan().getName());
+                    dto.setPlanDisplayName(payment.getSubscriptionPlan().getDisplayName());
+                    dto.setAmount(payment.getAmount());
+                    dto.setCurrency(payment.getCurrency());
+                    dto.setStatus(payment.getStatus().name());
+                    dto.setCreatedAt(payment.getCreatedAt());
+                    dto.setCompletedAt(payment.getCompletedAt());
+                    dto.setTransactionId(payment.getTransactionId());
+                    return dto;
+                })
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .collect(java.util.stream.Collectors.toList());
         
         return ResponseEntity.ok(stats);
     }
