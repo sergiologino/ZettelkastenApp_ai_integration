@@ -61,5 +61,14 @@ public class NetworkCreateRequest {
     
     @Schema(description = "Подробная инструкция по подключению с эндпоинтами и ответами", example = "Для подключения используйте...")
     private String connectionInstruction;
+    
+    @Schema(description = "Себестоимость одного токена в рублях (курс: 1 USD = 90 RUB)", example = "0.000045")
+    private java.math.BigDecimal costPerTokenRub;
+    
+    @Schema(description = "Примерное количество слов в одном токене (для текстовых моделей)", example = "0.75")
+    private java.math.BigDecimal wordsPerToken;
+    
+    @Schema(description = "Примерное количество секунд в одном токене (для транскрибации)", example = "0.1")
+    private java.math.BigDecimal secondsPerToken;
 }
 

@@ -19,7 +19,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,15 +36,21 @@ public class AdminController {
     private final NetworkManagementService networkService;
     private final ClientManagementService clientService;
     private final RequestLogRepository requestLogRepository;
+    private final com.example.integration.repository.NeuralNetworkRepository neuralNetworkRepository;
+    private final com.example.integration.repository.ClientApplicationRepository clientApplicationRepository;
     
     public AdminController(
         NetworkManagementService networkService,
         ClientManagementService clientService,
-        RequestLogRepository requestLogRepository
+        RequestLogRepository requestLogRepository,
+        com.example.integration.repository.NeuralNetworkRepository neuralNetworkRepository,
+        com.example.integration.repository.ClientApplicationRepository clientApplicationRepository
     ) {
         this.networkService = networkService;
         this.clientService = clientService;
         this.requestLogRepository = requestLogRepository;
+        this.neuralNetworkRepository = neuralNetworkRepository;
+        this.clientApplicationRepository = clientApplicationRepository;
     }
     
     // ==================== Neural Networks ====================
@@ -228,8 +233,10 @@ public class AdminController {
         Long totalTokens = requestLogRepository.sumTokensUsed();
         long totalTokensUsed = (totalTokens != null) ? totalTokens : 0L;
         
-        // Статистика по нейросетям
+        // Получаем все логи для детального анализа
         List<RequestLog> allLogs = requestLogRepository.findAll();
+        
+        // Статистика по нейросетям (запросы)
         java.util.Map<String, Long> requestsByNetwork = allLogs.stream()
             .filter(log -> log.getNeuralNetwork() != null)
             .collect(java.util.stream.Collectors.groupingBy(
@@ -237,7 +244,31 @@ public class AdminController {
                 java.util.stream.Collectors.counting()
             ));
         
-        // Статистика по клиентам
+        // Статистика по нейросетям (токены)
+        java.util.Map<String, Long> tokensByNetwork = allLogs.stream()
+            .filter(log -> log.getNeuralNetwork() != null && log.getTokensUsed() != null)
+            .collect(java.util.stream.Collectors.groupingBy(
+                log -> log.getNeuralNetwork().getDisplayName(),
+                java.util.stream.Collectors.summingLong(log -> log.getTokensUsed() != null ? log.getTokensUsed() : 0L)
+            ));
+        
+        // Статистика по нейросетям (стоимость)
+        java.util.Map<String, java.math.BigDecimal> costByNetwork = new java.util.HashMap<>();
+        java.math.BigDecimal totalCostRub = java.math.BigDecimal.ZERO;
+        
+        for (RequestLog log : allLogs) {
+            if (log.getNeuralNetwork() != null && log.getTokensUsed() != null && log.getTokensUsed() > 0) {
+                String networkName = log.getNeuralNetwork().getDisplayName();
+                java.math.BigDecimal costPerToken = log.getNeuralNetwork().getCostPerTokenRub();
+                if (costPerToken != null && costPerToken.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    java.math.BigDecimal cost = costPerToken.multiply(java.math.BigDecimal.valueOf(log.getTokensUsed()));
+                    costByNetwork.merge(networkName, cost, java.math.BigDecimal::add);
+                    totalCostRub = totalCostRub.add(cost);
+                }
+            }
+        }
+        
+        // Статистика по клиентам (запросы)
         java.util.Map<String, Long> requestsByClient = allLogs.stream()
             .filter(log -> log.getClientApp() != null)
             .collect(java.util.stream.Collectors.groupingBy(
@@ -245,13 +276,179 @@ public class AdminController {
                 java.util.stream.Collectors.counting()
             ));
         
+        // Статистика по клиентам (токены)
+        java.util.Map<String, Long> tokensByClient = allLogs.stream()
+            .filter(log -> log.getClientApp() != null && log.getTokensUsed() != null)
+            .collect(java.util.stream.Collectors.groupingBy(
+                log -> log.getClientApp().getName(),
+                java.util.stream.Collectors.summingLong(log -> log.getTokensUsed() != null ? log.getTokensUsed() : 0L)
+            ));
+        
+        // Статистика по клиентам (стоимость)
+        java.util.Map<String, java.math.BigDecimal> costByClient = new java.util.HashMap<>();
+        for (RequestLog log : allLogs) {
+            if (log.getClientApp() != null && log.getNeuralNetwork() != null && 
+                log.getTokensUsed() != null && log.getTokensUsed() > 0) {
+                String clientName = log.getClientApp().getName();
+                java.math.BigDecimal costPerToken = log.getNeuralNetwork().getCostPerTokenRub();
+                if (costPerToken != null && costPerToken.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    java.math.BigDecimal cost = costPerToken.multiply(java.math.BigDecimal.valueOf(log.getTokensUsed()));
+                    costByClient.merge(clientName, cost, java.math.BigDecimal::add);
+                }
+            }
+        }
+        
+        // Детальная статистика по нейросетям
+        java.util.List<NetworkStatsDetailDto> networkDetails = new java.util.ArrayList<>();
+        java.util.Map<java.util.UUID, java.util.List<RequestLog>> logsByNetworkId = allLogs.stream()
+            .filter(log -> log.getNeuralNetwork() != null)
+            .collect(java.util.stream.Collectors.groupingBy(log -> log.getNeuralNetwork().getId()));
+        
+        for (java.util.Map.Entry<java.util.UUID, java.util.List<RequestLog>> entry : logsByNetworkId.entrySet()) {
+            java.util.UUID networkId = entry.getKey();
+            java.util.List<RequestLog> networkLogs = entry.getValue();
+            
+            com.example.integration.model.NeuralNetwork network = neuralNetworkRepository.findById(networkId).orElse(null);
+            if (network == null) continue;
+            
+            long networkRequests = networkLogs.size();
+            long networkSuccessful = networkLogs.stream().filter(log -> "success".equals(log.getStatus())).count();
+            long networkFailed = networkLogs.stream().filter(log -> "failed".equals(log.getStatus())).count();
+            long networkTokens = networkLogs.stream()
+                .filter(log -> log.getTokensUsed() != null)
+                .mapToLong(RequestLog::getTokensUsed)
+                .sum();
+            
+            java.math.BigDecimal networkCost = java.math.BigDecimal.ZERO;
+            if (network.getCostPerTokenRub() != null && network.getCostPerTokenRub().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                networkCost = network.getCostPerTokenRub().multiply(java.math.BigDecimal.valueOf(networkTokens));
+            }
+            
+            // Статистика по клиентам для этой нейросети
+            java.util.Map<String, Long> requestsByClientForNetwork = networkLogs.stream()
+                .filter(log -> log.getClientApp() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                    log -> log.getClientApp().getName(),
+                    java.util.stream.Collectors.counting()
+                ));
+            
+            java.util.Map<String, Long> tokensByClientForNetwork = networkLogs.stream()
+                .filter(log -> log.getClientApp() != null && log.getTokensUsed() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                    log -> log.getClientApp().getName(),
+                    java.util.stream.Collectors.summingLong(log -> log.getTokensUsed() != null ? log.getTokensUsed() : 0L)
+                ));
+            
+            java.util.Map<String, java.math.BigDecimal> costByClientForNetwork = new java.util.HashMap<>();
+            for (RequestLog log : networkLogs) {
+                if (log.getClientApp() != null && log.getTokensUsed() != null && log.getTokensUsed() > 0) {
+                    String clientName = log.getClientApp().getName();
+                    java.math.BigDecimal costPerToken = network.getCostPerTokenRub();
+                    if (costPerToken != null && costPerToken.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        java.math.BigDecimal cost = costPerToken.multiply(java.math.BigDecimal.valueOf(log.getTokensUsed()));
+                        costByClientForNetwork.merge(clientName, cost, java.math.BigDecimal::add);
+                    }
+                }
+            }
+            
+            NetworkStatsDetailDto networkDetail = new NetworkStatsDetailDto(
+                networkId,
+                network.getName(),
+                network.getDisplayName(),
+                network.getProvider(),
+                networkRequests,
+                networkSuccessful,
+                networkFailed,
+                networkTokens,
+                networkCost,
+                network.getCostPerTokenRub(),
+                requestsByClientForNetwork,
+                tokensByClientForNetwork,
+                costByClientForNetwork
+            );
+            networkDetails.add(networkDetail);
+        }
+        
+        // Детальная статистика по клиентам
+        java.util.List<ClientStatsDetailDto> clientDetails = new java.util.ArrayList<>();
+        java.util.Map<java.util.UUID, java.util.List<RequestLog>> logsByClientId = allLogs.stream()
+            .filter(log -> log.getClientApp() != null)
+            .collect(java.util.stream.Collectors.groupingBy(log -> log.getClientApp().getId()));
+        
+        for (java.util.Map.Entry<java.util.UUID, java.util.List<RequestLog>> entry : logsByClientId.entrySet()) {
+            java.util.UUID clientId = entry.getKey();
+            java.util.List<RequestLog> clientLogs = entry.getValue();
+            
+            com.example.integration.model.ClientApplication client = clientApplicationRepository.findById(clientId).orElse(null);
+            if (client == null) continue;
+            
+            long clientRequests = clientLogs.size();
+            long clientSuccessful = clientLogs.stream().filter(log -> "success".equals(log.getStatus())).count();
+            long clientFailed = clientLogs.stream().filter(log -> "failed".equals(log.getStatus())).count();
+            long clientTokens = clientLogs.stream()
+                .filter(log -> log.getTokensUsed() != null)
+                .mapToLong(RequestLog::getTokensUsed)
+                .sum();
+            
+            java.math.BigDecimal clientCost = java.math.BigDecimal.ZERO;
+            
+            // Статистика по нейросетям для этого клиента
+            java.util.Map<String, Long> requestsByNetworkForClient = clientLogs.stream()
+                .filter(log -> log.getNeuralNetwork() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                    log -> log.getNeuralNetwork().getDisplayName(),
+                    java.util.stream.Collectors.counting()
+                ));
+            
+            java.util.Map<String, Long> tokensByNetworkForClient = clientLogs.stream()
+                .filter(log -> log.getNeuralNetwork() != null && log.getTokensUsed() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                    log -> log.getNeuralNetwork().getDisplayName(),
+                    java.util.stream.Collectors.summingLong(log -> log.getTokensUsed() != null ? log.getTokensUsed() : 0L)
+                ));
+            
+            java.util.Map<String, java.math.BigDecimal> costByNetworkForClient = new java.util.HashMap<>();
+            for (RequestLog log : clientLogs) {
+                if (log.getNeuralNetwork() != null && log.getTokensUsed() != null && log.getTokensUsed() > 0) {
+                    String networkName = log.getNeuralNetwork().getDisplayName();
+                    java.math.BigDecimal costPerToken = log.getNeuralNetwork().getCostPerTokenRub();
+                    if (costPerToken != null && costPerToken.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        java.math.BigDecimal cost = costPerToken.multiply(java.math.BigDecimal.valueOf(log.getTokensUsed()));
+                        costByNetworkForClient.merge(networkName, cost, java.math.BigDecimal::add);
+                        clientCost = clientCost.add(cost);
+                    }
+                }
+            }
+            
+            ClientStatsDetailDto clientDetail = new ClientStatsDetailDto(
+                clientId,
+                client.getName(),
+                clientRequests,
+                clientSuccessful,
+                clientFailed,
+                clientTokens,
+                clientCost,
+                requestsByNetworkForClient,
+                tokensByNetworkForClient,
+                costByNetworkForClient
+            );
+            clientDetails.add(clientDetail);
+        }
+        
         AdminStatsDTO stats = new AdminStatsDTO(
             totalRequests,
             successfulRequests,
             failedRequests,
             totalTokensUsed,
+            totalCostRub,
             requestsByNetwork,
-            requestsByClient
+            requestsByClient,
+            tokensByNetwork,
+            costByNetwork,
+            tokensByClient,
+            costByClient,
+            networkDetails,
+            clientDetails
         );
         
         return ResponseEntity.ok(stats);
