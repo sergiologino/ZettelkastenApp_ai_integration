@@ -2,10 +2,12 @@ package com.example.integration.service;
 
 import com.example.integration.dto.ClientNetworkAccessDTO;
 import com.example.integration.dto.GrantAccessRequest;
+import com.example.integration.dto.UserAccessGroupDto;
+import com.example.integration.dto.ClientServiceDto;
+import com.example.integration.dto.NetworkAccessInfoDto;
 import com.example.integration.model.ClientApplication;
 import com.example.integration.model.ClientNetworkAccess;
 import com.example.integration.model.NeuralNetwork;
-import com.example.integration.dto.UserAccessGroupDto;
 import com.example.integration.model.UserAccount;
 import com.example.integration.repository.ClientApplicationRepository;
 import com.example.integration.repository.ClientNetworkAccessRepository;
@@ -286,21 +288,21 @@ public class NetworkAccessService {
                 adminGroup.setUserEmail("Администратор");
                 adminGroup.setUserFullName("Администратор");
                 
-                List<UserAccessGroupDto.ClientServiceDto> adminServices = new ArrayList<>();
+                List<ClientServiceDto> adminServices = new ArrayList<>();
                 for (Map.Entry<UUID, List<ClientNetworkAccess>> clientEntry : userEntry.getValue().entrySet()) {
                     UUID clientId = clientEntry.getKey();
                     ClientApplication client = clientApplicationRepository.findById(clientId).orElse(null);
                     if (client == null) continue;
                     
-                    UserAccessGroupDto.ClientServiceDto serviceDto = new UserAccessGroupDto.ClientServiceDto();
+                    ClientServiceDto serviceDto = new ClientServiceDto();
                     serviceDto.setClientId(clientId);
                     serviceDto.setClientName(client.getName());
                     serviceDto.setClientDescription(client.getDescription());
                     serviceDto.setIsAdminService(true);
                     
-                    List<UserAccessGroupDto.NetworkAccessInfoDto> networks = clientEntry.getValue().stream()
+                    List<NetworkAccessInfoDto> networks = clientEntry.getValue().stream()
                             .map(access -> {
-                                UserAccessGroupDto.NetworkAccessInfoDto networkDto = new UserAccessGroupDto.NetworkAccessInfoDto();
+                                NetworkAccessInfoDto networkDto = new NetworkAccessInfoDto();
                                 networkDto.setAccessId(access.getId());
                                 networkDto.setNetworkId(access.getNeuralNetwork().getId());
                                 networkDto.setNetworkDisplayName(access.getNeuralNetwork().getDisplayName());
@@ -311,7 +313,7 @@ public class NetworkAccessService {
                                 networkDto.setPriority(access.getPriority());
                                 return networkDto;
                             })
-                            .sorted(Comparator.comparing(UserAccessGroupDto.NetworkAccessInfoDto::getPriority, 
+                            .sorted(Comparator.comparing(NetworkAccessInfoDto::getPriority, 
                                     Comparator.nullsLast(Comparator.naturalOrder())))
                             .collect(Collectors.toList());
                     
@@ -334,21 +336,21 @@ public class NetworkAccessService {
                 userGroup.setUserEmail(user.getEmail());
                 userGroup.setUserFullName(user.getFullName());
                 
-                List<UserAccessGroupDto.ClientServiceDto> userServices = new ArrayList<>();
+                List<ClientServiceDto> userServices = new ArrayList<>();
                 for (Map.Entry<UUID, List<ClientNetworkAccess>> clientEntry : userEntry.getValue().entrySet()) {
                     UUID clientId = clientEntry.getKey();
                     ClientApplication client = clientApplicationRepository.findById(clientId).orElse(null);
                     if (client == null) continue;
                     
-                    UserAccessGroupDto.ClientServiceDto serviceDto = new UserAccessGroupDto.ClientServiceDto();
+                    ClientServiceDto serviceDto = new ClientServiceDto();
                     serviceDto.setClientId(clientId);
                     serviceDto.setClientName(client.getName());
                     serviceDto.setClientDescription(client.getDescription());
                     serviceDto.setIsAdminService(false);
                     
-                    List<UserAccessGroupDto.NetworkAccessInfoDto> networks = clientEntry.getValue().stream()
+                    List<NetworkAccessInfoDto> networks = clientEntry.getValue().stream()
                             .map(access -> {
-                                UserAccessGroupDto.NetworkAccessInfoDto networkDto = new UserAccessGroupDto.NetworkAccessInfoDto();
+                                NetworkAccessInfoDto networkDto = new NetworkAccessInfoDto();
                                 networkDto.setAccessId(access.getId());
                                 networkDto.setNetworkId(access.getNeuralNetwork().getId());
                                 networkDto.setNetworkDisplayName(access.getNeuralNetwork().getDisplayName());
@@ -359,7 +361,7 @@ public class NetworkAccessService {
                                 networkDto.setPriority(access.getPriority());
                                 return networkDto;
                             })
-                            .sorted(Comparator.comparing(UserAccessGroupDto.NetworkAccessInfoDto::getPriority, 
+                            .sorted(Comparator.comparing(NetworkAccessInfoDto::getPriority, 
                                     Comparator.nullsLast(Comparator.naturalOrder())))
                             .collect(Collectors.toList());
                     
