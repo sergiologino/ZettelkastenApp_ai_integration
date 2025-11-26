@@ -129,8 +129,8 @@ public class UserService {
         if (!Objects.equals(request.getPassword(), request.getRepeatPassword())) {
             throw new IllegalArgumentException("Пароль и повтор пароля не совпадают");
         }
-        if (request.getPassword().length() < 5) {
-            throw new IllegalArgumentException("Пароль должен быть не короче 6 символов");
+        if (request.getPassword().length() < 4) {
+            throw new IllegalArgumentException("Пароль должен быть не короче 5 символов");
         }
     }
 }
