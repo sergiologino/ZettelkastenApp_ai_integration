@@ -12,6 +12,7 @@ public class ClientNetworkAccessDTO {
     private UUID clientId;
     private String clientName;
     private UUID networkId;
+    private String networkName;
     private String networkDisplayName;
     private String networkProvider;
     private String networkType;
@@ -24,13 +25,14 @@ public class ClientNetworkAccessDTO {
     public ClientNetworkAccessDTO() {}
 
     public ClientNetworkAccessDTO(UUID id, UUID clientId, String clientName, UUID networkId, 
-                                 String networkDisplayName, String networkProvider, String networkType,
+                                 String networkName, String networkDisplayName, String networkProvider, String networkType,
                                  Integer dailyRequestLimit, Integer monthlyRequestLimit,
                                  LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.clientId = clientId;
         this.clientName = clientName;
         this.networkId = networkId;
+        this.networkName = networkName;
         this.networkDisplayName = networkDisplayName;
         this.networkProvider = networkProvider;
         this.networkType = networkType;
@@ -71,6 +73,14 @@ public class ClientNetworkAccessDTO {
 
     public void setNetworkId(UUID networkId) {
         this.networkId = networkId;
+    }
+
+    public String getNetworkName() {
+        return networkName;
+    }
+
+    public void setNetworkName(String networkName) {
+        this.networkName = networkName;
     }
 
     public String getNetworkDisplayName() {

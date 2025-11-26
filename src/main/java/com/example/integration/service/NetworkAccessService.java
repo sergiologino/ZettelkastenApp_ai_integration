@@ -401,6 +401,7 @@ public class NetworkAccessService {
                 access.getClientApplication().getId(),
                 access.getClientApplication().getName(),
                 access.getNeuralNetwork().getId(),
+                access.getNeuralNetwork().getName(),
                 access.getNeuralNetwork().getDisplayName(),
                 access.getNeuralNetwork().getProvider(),
                 access.getNeuralNetwork().getNetworkType(),
