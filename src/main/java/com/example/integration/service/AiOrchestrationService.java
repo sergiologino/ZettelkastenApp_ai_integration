@@ -33,7 +33,6 @@ public class AiOrchestrationService {
     private final NeuralNetworkRepository neuralNetworkRepository;
     private final ExternalUserRepository externalUserRepository;
     private final RequestLogRepository requestLogRepository;
-    private final ClientApplicationRepository clientAppRepository;
     private final NetworkAccessService networkAccessService;
     private final SubscriptionLimitService subscriptionLimitService;
     private final UserApiKeyService userApiKeyService;
@@ -59,7 +58,6 @@ public class AiOrchestrationService {
         this.neuralNetworkRepository = neuralNetworkRepository;
         this.externalUserRepository = externalUserRepository;
         this.requestLogRepository = requestLogRepository;
-        this.clientAppRepository = clientAppRepository;
         this.networkAccessService = networkAccessService;
         this.subscriptionLimitService = subscriptionLimitService;
         this.userApiKeyService = userApiKeyService;
@@ -230,10 +228,10 @@ public class AiOrchestrationService {
     }
     
     private Integer extractTokensFromResponse(Map<String, Object> response) {
-        if (response.containsKey("usage")) {
-            Map<String, Object> usage = (Map<String, Object>) response.get("usage");
-            if (usage.containsKey("total_tokens")) {
-                return ((Number) usage.get("total_tokens")).intValue();
+        if (response.containsKey("usage") && response.get("usage") instanceof Map<?, ?> usage) {
+            Object totalTokens = usage.get("total_tokens");
+            if (totalTokens instanceof Number n) {
+                return n.intValue();
             }
         }
         return 0;
@@ -396,6 +394,22 @@ public class AiOrchestrationService {
         limits.put("remainingRequestsMonth", null); // Пока не реализовано
         limits.put("hasLimits", false); // Пока не реализовано
         
+        return limits;
+    }
+
+    public Map<String, Object> getClientNetworkLimits(ClientApplication clientApp, String networkId) {
+        Map<String, Object> limits = new HashMap<>();
+        limits.put("networkId", networkId);
+
+        networkAccessService.getClientNetworkAccess(clientApp.getId(), networkId).ifPresent(access -> {
+            limits.put("networkName", access.getNetworkName());
+            limits.put("remainingRequestsToday", access.getDailyRequestLimit());
+            limits.put("remainingRequestsMonth", access.getMonthlyRequestLimit());
+            boolean hasDaily = access.getDailyRequestLimit() != null && access.getDailyRequestLimit() > 0;
+            boolean hasMonthly = access.getMonthlyRequestLimit() != null && access.getMonthlyRequestLimit() > 0;
+            limits.put("hasLimits", hasDaily || hasMonthly);
+        });
+
         return limits;
     }
     

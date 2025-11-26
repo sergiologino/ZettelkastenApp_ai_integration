@@ -212,6 +212,13 @@ public class NetworkAccessService {
         return accesses;
     }
 
+    @Transactional(readOnly = true)
+    public Optional<ClientNetworkAccessDTO> getClientNetworkAccess(UUID clientId, String networkName) {
+        return getClientAccesses(clientId).stream()
+                .filter(dto -> dto.getNetworkName().equalsIgnoreCase(networkName))
+                .findFirst();
+    }
+
     /**
      * Получить статистику доступов
      */
