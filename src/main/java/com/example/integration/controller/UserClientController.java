@@ -7,6 +7,11 @@ import com.example.integration.dto.user.NetworkUsageStatsDto;
 import com.example.integration.dto.user.SetClientNetworksRequest;
 import com.example.integration.service.UserClientService;
 import com.example.integration.service.UserContextService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +23,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/user")
+@Tag(name = "Client Applications", description = "Управление клиентскими приложениями конкретного пользователя (реферальные ключи, доступ к сетям). Требуется пользовательская авторизация.")
 public class UserClientController {
 
     private final UserContextService userContextService;
@@ -28,6 +34,7 @@ public class UserClientController {
         this.userClientService = userClientService;
     }
 
+    @Operation(summary = "Список клиентских приложений", description = "Возвращает все приложения, созданные текущим пользователем, вместе с API-ключами и статусом.")
     @GetMapping("/clients")
     public ResponseEntity<?> listClients(HttpServletRequest request) {
         return userContextService.resolveCurrentUser(request)
@@ -35,6 +42,25 @@ public class UserClientController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
+    @Operation(
+            summary = "Создать клиентское приложение",
+            description = "Создаёт новое приложение и автоматически привязывает его к текущему пользователю.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ClientCreateRequest.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "name": "noteapp",
+                                      "description": "Prod integration for AltaNote",
+                                      "allowedIps": ["31.173.24.10/32"],
+                                      "webhookUrl": "https://noteapp.ru/api/ai/webhook"
+                                    }
+                                    """)
+                    )
+            )
+    )
     @PostMapping("/clients")
     public ResponseEntity<?> createClient(HttpServletRequest request, @RequestBody ClientCreateRequest req) {
         return userContextService.resolveCurrentUser(request)
@@ -49,6 +75,7 @@ public class UserClientController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
+    @Operation(summary = "Обновить параметры клиента", description = "Позволяет изменить описание, IP-белый список, webhook и др. для указанного клиента.")
     @PutMapping("/clients/{id}")
     public ResponseEntity<?> updateClient(HttpServletRequest request, @PathVariable("id") UUID id, @RequestBody ClientUpdateRequest req) {
         return userContextService.resolveCurrentUser(request)
@@ -63,6 +90,7 @@ public class UserClientController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
+    @Operation(summary = "Удалить клиентское приложение", description = "Удаляет приложение и отвязывает все связанные ключи/сети.")
     @DeleteMapping("/clients/{id}")
     public ResponseEntity<?> deleteClient(HttpServletRequest request, @PathVariable("id") UUID id) {
         return userContextService.resolveCurrentUser(request)
@@ -77,6 +105,7 @@ public class UserClientController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
+    @Operation(summary = "Сгенерировать новый API-ключ", description = "Пересоздаёт секрет для приложения и возвращает свежий ключ.")
     @PostMapping("/clients/{id}/regenerate-key")
     public ResponseEntity<?> regenerateKey(HttpServletRequest request, @PathVariable("id") UUID id) {
         return userContextService.resolveCurrentUser(request)
@@ -91,19 +120,43 @@ public class UserClientController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
-    /**
-     * Получить список доступных активных нейросетей
-     */
+    @Operation(summary = "Список активных нейросетей", description = "Возвращает все нейросети, которые сейчас доступны пользователю для подключения к своим приложениям.")
     @GetMapping("/networks/available")
     public ResponseEntity<?> availableNetworks() {
         return ResponseEntity.ok(userClientService.getAvailableNetworks());
     }
 
-    /**
-     * Установить список подключенных нейросетей для клиента
-     */
+    @Operation(
+            summary = "Назначить нейросети клиенту",
+            description = "Управляет доступом клиента к сетям. Можно передать простой список `networkIds` или расширенный `networks` с приоритетом.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = SetClientNetworksRequest.class),
+                            examples = {
+                                    @ExampleObject(name = "Простой формат", value = """
+                                            {
+                                              "networkIds": [
+                                                "2d8f6a7a-8b5d-45c9-9df3-3c0c1cf6d1ef",
+                                                "97d3b52c-12e0-42c8-90c0-27cf66a9c607"
+                                              ]
+                                            }
+                                            """),
+                                    @ExampleObject(name = "Расширенный формат", value = """
+                                            {
+                                              "networks": [
+                                                {"networkId": "2d8f6a7a-8b5d-45c9-9df3-3c0c1cf6d1ef", "priority": 10},
+                                                {"networkId": "97d3b52c-12e0-42c8-90c0-27cf66a9c607", "priority": 5}
+                                              ]
+                                            }
+                                            """)
+                            }
+                    )
+            )
+    )
     @PutMapping("/clients/{id}/networks")
-    public ResponseEntity<?> setClientNetworks(HttpServletRequest request, 
+    public ResponseEntity<?> setClientNetworks(HttpServletRequest request,
                                                 @PathVariable("id") UUID id,
                                                 @RequestBody SetClientNetworksRequest req) {
         return userContextService.resolveCurrentUser(request)
@@ -127,9 +180,7 @@ public class UserClientController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
-    /**
-     * Получить список подключенных нейросетей для клиента с приоритетами
-     */
+    @Operation(summary = "Список сетей клиента", description = "Возвращает текущий набор нейросетей, назначенных клиенту, включая приоритеты.")
     @GetMapping("/clients/{id}/networks")
     public ResponseEntity<?> getClientNetworks(HttpServletRequest request, @PathVariable("id") UUID id) {
         return userContextService.resolveCurrentUser(request)
@@ -145,9 +196,7 @@ public class UserClientController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
-    /**
-     * Получить статистику использования нейросетей для клиента
-     */
+    @Operation(summary = "Статистика по сетям клиента", description = "Обороты запросов/токенов по каждой нейросети для выбранного клиента.")
     @GetMapping("/clients/{id}/networks/stats")
     public ResponseEntity<?> getNetworkStats(HttpServletRequest request, @PathVariable("id") UUID id) {
         return userContextService.resolveCurrentUser(request)
