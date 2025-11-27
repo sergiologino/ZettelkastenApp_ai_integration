@@ -36,6 +36,7 @@ public class AiOrchestrationService {
     private final SubscriptionLimitService subscriptionLimitService;
     private final UserApiKeyService userApiKeyService;
     private final com.example.integration.repository.UserClientLinkRepository userClientLinkRepository;
+    private final com.example.integration.repository.ClientNetworkAccessRepository clientNetworkAccessRepository;
     
     @Value("${ai.enable-fallback:true}")
     private boolean enableFallback;
@@ -50,7 +51,8 @@ public class AiOrchestrationService {
         NetworkAccessService networkAccessService,
         SubscriptionLimitService subscriptionLimitService,
         UserApiKeyService userApiKeyService,
-        com.example.integration.repository.UserClientLinkRepository userClientLinkRepository
+        com.example.integration.repository.UserClientLinkRepository userClientLinkRepository,
+        com.example.integration.repository.ClientNetworkAccessRepository clientNetworkAccessRepository
     ) {
         this.clientFactory = clientFactory;
         this.rateLimitService = rateLimitService;
@@ -61,6 +63,7 @@ public class AiOrchestrationService {
         this.subscriptionLimitService = subscriptionLimitService;
         this.userApiKeyService = userApiKeyService;
         this.userClientLinkRepository = userClientLinkRepository;
+        this.clientNetworkAccessRepository = clientNetworkAccessRepository;
     }
     
     /**
@@ -79,8 +82,8 @@ public class AiOrchestrationService {
         // 1. Получить или создать пользователя
         ExternalUser user = getOrCreateUser(clientApp, request.getUserId());
         
-        // 2. Выбрать нейросеть
-        NeuralNetwork network = selectNetwork(request.getNetworkName(), request.getRequestType(), user);
+        // 2. Выбрать нейросеть (с учетом доступов клиента и приоритетов из админки)
+        NeuralNetwork network = selectNetwork(clientApp, request.getNetworkName(), request.getRequestType(), user);
         log.info("   ✅ Выбрана нейросеть: {} (ID: {}, name: {})", network.getDisplayName(), network.getId(), network.getName());
         
         // 2.5. Проверить лимиты подписки
@@ -193,7 +196,7 @@ public class AiOrchestrationService {
             });
     }
     
-    private NeuralNetwork selectNetwork(String networkName, String requestType, ExternalUser user) {
+    private NeuralNetwork selectNetwork(ClientApplication clientApp, String networkName, String requestType, ExternalUser user) {
         NeuralNetwork network;
         
         if (networkName != null && !networkName.isEmpty()) {
@@ -214,14 +217,32 @@ public class AiOrchestrationService {
             network = networkOpt.get();
             log.info("   ✅ Найдена нейросеть: {} (name: '{}', id: {})", network.getDisplayName(), network.getName(), network.getId());
         } else {
-            // Автоматический выбор по типу запроса и приоритету
-            log.info("   🔍 Автовыбор нейросети для типа: {}", requestType);
-            network = neuralNetworkRepository.findByTypeOrderedByPriority(requestType)
-                .stream()
-                .filter(n -> n.getIsActive() && rateLimitService.isNetworkAvailable(user, n))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No available network for type: " + requestType));
-            log.info("   ✅ Автоматически выбрана нейросеть: {} (name: '{}', id: {})", network.getDisplayName(), network.getName(), network.getId());
+            // Автоматический выбор из доступных нейросетей клиента с учетом приоритетов из админки
+            log.info("   🔍 Автовыбор нейросети для типа: {} из доступных для клиента {}", requestType, clientApp.getName());
+            
+            // Получаем все доступы клиента, отсортированные по приоритету (меньше = выше приоритет)
+            // Используем прямой запрос к репозиторию для получения доступа с приоритетами
+            List<com.example.integration.model.ClientNetworkAccess> clientAccesses = 
+                clientNetworkAccessRepository.findByClientApplicationOrderByPriorityAsc(clientApp)
+                    .stream()
+                    .filter(access -> access.getNeuralNetwork().getIsActive())
+                    .filter(access -> {
+                        // Фильтруем по типу запроса
+                        String networkType = access.getNeuralNetwork().getNetworkType();
+                        return networkType != null && networkType.equalsIgnoreCase(requestType);
+                    })
+                    .filter(access -> rateLimitService.isNetworkAvailable(user, access.getNeuralNetwork()))
+                    .collect(java.util.stream.Collectors.toList());
+            
+            if (clientAccesses.isEmpty()) {
+                log.error("   ❌ Нет доступных нейросетей для клиента {} типа {}", clientApp.getName(), requestType);
+                throw new IllegalStateException("No available network for client " + clientApp.getName() + " and type: " + requestType);
+            }
+            
+            network = clientAccesses.get(0).getNeuralNetwork();
+            Integer priority = clientAccesses.get(0).getPriority();
+            log.info("   ✅ Автоматически выбрана нейросеть: {} (name: '{}', id: {}, priority: {})", 
+                network.getDisplayName(), network.getName(), network.getId(), priority);
         }
         
         // Проверяем доступность
