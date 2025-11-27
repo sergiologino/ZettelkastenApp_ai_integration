@@ -8,6 +8,7 @@ import com.example.integration.service.UserApiKeyService;
 import com.example.integration.service.UserContextService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/user/api-keys")
+@SecurityRequirement(name = "Bearer")
 public class UserApiKeyController {
     
     private final UserApiKeyService userApiKeyService;

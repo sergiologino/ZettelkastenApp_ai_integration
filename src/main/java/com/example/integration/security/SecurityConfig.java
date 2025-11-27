@@ -87,7 +87,7 @@ public class SecurityConfig {
                 // Пользовательский кабинет - только специфичные пути (auth уже обработан выше)
                 // НЕ используем общее правило /api/user/** чтобы избежать конфликтов с /api/user/auth/**
                 .requestMatchers("/api/user/clients/**").hasAnyRole("USER","ADMIN")
-                .requestMatchers("/api/user/networks/**").permitAll()//.hasRole("USER")
+                .requestMatchers("/api/user/networks/**").hasAnyRole("USER","ADMIN")
                 .requestMatchers("/api/user/subscriptions/**").hasAnyRole("USER","ADMIN")
                 .requestMatchers("/api/user/api-keys/**").hasAnyRole("USER","ADMIN")
                 // Webhook от платежных провайдеров (публичный, но должен быть защищен на уровне провайдера)

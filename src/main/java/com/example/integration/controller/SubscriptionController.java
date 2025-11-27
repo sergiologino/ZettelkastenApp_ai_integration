@@ -8,6 +8,7 @@ import com.example.integration.service.PaymentService;
 import com.example.integration.service.SubscriptionService;
 import com.example.integration.service.UserContextService;
 import jakarta.servlet.http.HttpServletRequest;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/api/user/subscriptions")
+@SecurityRequirement(name = "Bearer")
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
