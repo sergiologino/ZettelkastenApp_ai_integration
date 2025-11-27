@@ -198,30 +198,45 @@ public class UserClientController {
 
     @Operation(
             summary = "Назначить нейросети клиенту",
-            description = "Управляет доступом клиента к сетям. Можно передать простой список `networkIds` или расширенный `networks` с приоритетом.",
+            description = """
+                    Управляет доступом клиента к нейросетям. Поддерживаются два формата:
+                    
+                    **Простой формат** (рекомендуется):
+                    ```json
+                    {
+                      "networkIds": [
+                        "2d8f6a7a-8b5d-45c9-9df3-3c0c1cf6d1ef",
+                        "97d3b52c-12e0-42c8-90c0-27cf66a9c607"
+                      ]
+                    }
+                    ```
+                    
+                    **Расширенный формат** (с приоритетами):
+                    ```json
+                    {
+                      "networks": [
+                        {"networkId": "2d8f6a7a-8b5d-45c9-9df3-3c0c1cf6d1ef", "priority": 10},
+                        {"networkId": "97d3b52c-12e0-42c8-90c0-27cf66a9c607", "priority": 5}
+                      ]
+                    }
+                    ```
+                    
+                    **Важно:** Используйте только один формат в одном запросе. Приоритет определяет порядок выбора нейросети (меньше = выше приоритет).
+                    """,
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = SetClientNetworksRequest.class),
-                            examples = {
-                                    @ExampleObject(name = "Простой формат", value = """
+                            schema = @Schema(
+                                    implementation = SetClientNetworksRequest.class,
+                                    example = """
                                             {
                                               "networkIds": [
-                                                "2d8f6a7a-8b5d-45c9-9df3-3c0c1cf6d1ef",
-                                                "97d3b52c-12e0-42c8-90c0-27cf66a9c607"
+                                                "2d8f6a7a-8b5d-45c9-9df3-3c0c1cf6d1ef"
                                               ]
                                             }
-                                            """),
-                                    @ExampleObject(name = "Расширенный формат", value = """
-                                            {
-                                              "networks": [
-                                                {"networkId": "2d8f6a7a-8b5d-45c9-9df3-3c0c1cf6d1ef", "priority": 10},
-                                                {"networkId": "97d3b52c-12e0-42c8-90c0-27cf66a9c607", "priority": 5}
-                                              ]
-                                            }
-                                            """)
-                            }
+                                            """
+                            )
                     )
             )
     )
