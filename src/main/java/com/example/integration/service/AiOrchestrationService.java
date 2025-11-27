@@ -70,11 +70,18 @@ public class AiOrchestrationService {
     public AiResponseDTO processRequest(ClientApplication clientApp, AiRequestDTO request) {
         long startTime = System.currentTimeMillis();
         
+        log.info("🚀 [AiOrchestrationService] ===== Новый AI запрос =====");
+        log.info("   Клиент: {} (ID: {})", clientApp.getName(), clientApp.getId());
+        log.info("   UserId: {}", request.getUserId());
+        log.info("   Запрошенная нейросеть: {}", request.getNetworkName() != null ? request.getNetworkName() : "автовыбор");
+        log.info("   Тип запроса: {}", request.getRequestType());
+        
         // 1. Получить или создать пользователя
         ExternalUser user = getOrCreateUser(clientApp, request.getUserId());
         
         // 2. Выбрать нейросеть
         NeuralNetwork network = selectNetwork(request.getNetworkName(), request.getRequestType(), user);
+        log.info("   ✅ Выбрана нейросеть: {} (ID: {}, name: {})", network.getDisplayName(), network.getId(), network.getName());
         
         // 2.5. Проверить лимиты подписки
         String limitError = subscriptionLimitService.checkRequestLimit(clientApp, network);
@@ -191,15 +198,30 @@ public class AiOrchestrationService {
         
         if (networkName != null && !networkName.isEmpty()) {
             // Пользователь указал конкретную нейросеть
-            network = neuralNetworkRepository.findByName(networkName)
-                .orElseThrow(() -> new IllegalArgumentException("Network not found: " + networkName));
+            log.info("   🔍 Ищем нейросеть по имени: '{}'", networkName);
+            Optional<NeuralNetwork> networkOpt = neuralNetworkRepository.findByName(networkName);
+            if (networkOpt.isEmpty()) {
+                log.error("   ❌ Нейросеть с именем '{}' не найдена в БД", networkName);
+                // Покажем все доступные нейросети для диагностики
+                List<NeuralNetwork> allNetworks = neuralNetworkRepository.findAll();
+                log.info("   📋 Всего нейросетей в БД: {}", allNetworks.size());
+                allNetworks.forEach(n -> {
+                    log.info("      - name: '{}', displayName: '{}', id: {}, active: {}", 
+                        n.getName(), n.getDisplayName(), n.getId(), n.getIsActive());
+                });
+                throw new IllegalArgumentException("Network not found: " + networkName);
+            }
+            network = networkOpt.get();
+            log.info("   ✅ Найдена нейросеть: {} (name: '{}', id: {})", network.getDisplayName(), network.getName(), network.getId());
         } else {
             // Автоматический выбор по типу запроса и приоритету
+            log.info("   🔍 Автовыбор нейросети для типа: {}", requestType);
             network = neuralNetworkRepository.findByTypeOrderedByPriority(requestType)
                 .stream()
                 .filter(n -> n.getIsActive() && rateLimitService.isNetworkAvailable(user, n))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No available network for type: " + requestType));
+            log.info("   ✅ Автоматически выбрана нейросеть: {} (name: '{}', id: {})", network.getDisplayName(), network.getName(), network.getId());
         }
         
         // Проверяем доступность

@@ -35,14 +35,16 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         
         String requestURI = request.getRequestURI();
         boolean isNetworksEndpoint = requestURI != null && requestURI.contains("/networks/available");
+        boolean isAiProcessEndpoint = requestURI != null && requestURI.contains("/api/ai/process");
+        boolean shouldLog = isNetworksEndpoint || isAiProcessEndpoint;
         
-        if (isNetworksEndpoint) {
-            log.info("🔵 [ApiKeyAuthFilter] Обработка запроса к /networks/available");
+        if (shouldLog) {
+            log.info("🔵 [ApiKeyAuthFilter] Обработка запроса: {}", requestURI);
         }
         
         String apiKey = request.getHeader("X-API-Key");
         
-        if (isNetworksEndpoint) {
+        if (shouldLog) {
             log.info("🔍 [ApiKeyAuthFilter] X-API-Key header: {}", apiKey != null && !apiKey.isEmpty() ? "присутствует" : "отсутствует");
             if (apiKey != null && !apiKey.isEmpty()) {
                 log.info("🔍 [ApiKeyAuthFilter] API Key длина: {}", apiKey.length());
@@ -54,7 +56,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             Optional<ClientApplication> clientApp = clientAppRepository.findByApiKey(apiKey);
             
             if (clientApp.isPresent() && clientApp.get().getIsActive()) {
-                if (isNetworksEndpoint) {
+                if (shouldLog) {
                     log.info("✅ [ApiKeyAuthFilter] Клиент найден: {} (ID: {})", 
                         clientApp.get().getName(), clientApp.get().getId());
                 }
@@ -66,7 +68,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                     );
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } else {
-                if (isNetworksEndpoint) {
+                if (shouldLog) {
                     if (clientApp.isEmpty()) {
                         log.warn("⚠️ [ApiKeyAuthFilter] Клиент с таким API ключом не найден");
                     } else if (!clientApp.get().getIsActive()) {
@@ -75,7 +77,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                 }
             }
         } else {
-            if (isNetworksEndpoint) {
+            if (shouldLog) {
                 log.warn("⚠️ [ApiKeyAuthFilter] X-API-Key заголовок отсутствует или пуст");
             }
         }
