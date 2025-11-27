@@ -16,6 +16,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Arrays;
 import java.util.List;
@@ -96,7 +97,23 @@ public class SecurityConfig {
                 .requestMatchers("/api/ai/**").authenticated()
                 // Все остальное запрещено
                 .anyRequest().denyAll()
-            );
+            )
+            // Добавляем обработчик для логирования доступа
+            .exceptionHandling(ex -> {
+                ex.accessDeniedHandler((request, response, accessDeniedException) -> {
+                    log.error("❌ [SecurityConfig] Доступ запрещен для {} {}: {}", 
+                        request.getMethod(), request.getRequestURI(), accessDeniedException.getMessage());
+                    org.springframework.security.core.Authentication auth = 
+                        org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                    if (auth != null) {
+                        log.error("   Principal: {}, Authorities: {}", 
+                            auth.getPrincipal().getClass().getName(), auth.getAuthorities());
+                    } else {
+                        log.error("   Authentication отсутствует!");
+                    }
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                });
+            });
         
         log.warn("✅ SecurityFilterChain настроен - JWT и API Key фильтры включены");
         log.warn("🔓 Публичные эндпоинты: /api/auth/**, /api/user/auth/**, /login/**");
