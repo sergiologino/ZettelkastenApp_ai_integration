@@ -6,6 +6,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,6 +21,8 @@ import java.util.Collections;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
+    
     private final JwtUtil jwtUtil;
     private final AdminUserRepository adminUserRepository;
     private final UserAccountRepository userAccountRepository;
@@ -45,22 +49,39 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String subject = jwtUtil.getUsernameFromToken(jwt);
+        log.debug("🔍 [JwtAuthFilter] Извлечен subject из токена: {}", subject);
 
-        // Try admin (by username)
+        // Try admin (by username first, then by email)
         var adminOpt = adminUserRepository.findByUsername(subject);
+        if (adminOpt.isEmpty()) {
+            // Если не найден по username, пробуем по email
+            adminOpt = adminUserRepository.findByEmail(subject);
+        }
+        
         if (adminOpt.isPresent() && Boolean.TRUE.equals(adminOpt.get().getIsActive())) {
+            log.info("✅ [JwtAuthFilter] Найден активный админ: {} (username: {})", subject, adminOpt.get().getUsername());
             var auth = new UsernamePasswordAuthenticationToken(
                     adminOpt.get(), null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
             SecurityContextHolder.getContext().setAuthentication(auth);
+            log.debug("✅ [JwtAuthFilter] Роль ROLE_ADMIN установлена в SecurityContext");
         } else {
             // Fallback to end-user by email
-            userAccountRepository.findByEmail(subject).ifPresent(user -> {
+            log.debug("🔍 [JwtAuthFilter] Админ не найден, ищем пользователя по email: {}", subject);
+            var userOpt = userAccountRepository.findByEmail(subject);
+            if (userOpt.isPresent()) {
+                var user = userOpt.get();
                 if (user.isActive()) {
+                    log.info("✅ [JwtAuthFilter] Найден активный пользователь: {} (email: {})", subject, user.getEmail());
                     var auth = new UsernamePasswordAuthenticationToken(
                             user, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
                     SecurityContextHolder.getContext().setAuthentication(auth);
+                    log.debug("✅ [JwtAuthFilter] Роль ROLE_USER установлена в SecurityContext");
+                } else {
+                    log.warn("⚠️ [JwtAuthFilter] Пользователь {} найден, но неактивен", subject);
                 }
-            });
+            } else {
+                log.warn("⚠️ [JwtAuthFilter] Пользователь {} не найден ни в админах, ни в пользователях", subject);
+            }
         }
 
         filterChain.doFilter(request, response);
