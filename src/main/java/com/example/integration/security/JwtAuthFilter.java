@@ -44,10 +44,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
         log.info("🔍 [JwtAuthFilter] ===== Обработка запроса: {} {} =====", request.getMethod(), path);
-
+        
+        // Логируем все заголовки для отладки
+        String authHeader = request.getHeader("Authorization");
+        log.info("🔍 [JwtAuthFilter] Заголовок Authorization: {}", authHeader != null ? (authHeader.length() > 20 ? authHeader.substring(0, 20) + "..." : authHeader) : "null");
+        
         String jwt = getJwtFromRequest(request);
         if (!StringUtils.hasText(jwt)) {
-            log.info("⚠️ [JwtAuthFilter] JWT токен отсутствует в заголовке Authorization");
+            log.warn("⚠️ [JwtAuthFilter] JWT токен отсутствует в заголовке Authorization. Проверьте формат: 'Bearer <token>'");
             filterChain.doFilter(request, response);
             return;
         }
