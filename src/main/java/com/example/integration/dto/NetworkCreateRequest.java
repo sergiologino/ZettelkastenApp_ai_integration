@@ -18,7 +18,7 @@ public class NetworkCreateRequest {
     @NotBlank(message = "Display name is required")
     private String displayName;
     
-    @Schema(description = "Провайдер", example = "openai", allowableValues = {"openai", "yandex", "anthropic", "mistral", "sber", "whisper"}, required = true)
+    @Schema(description = "Провайдер", example = "openai", allowableValues = {"openai", "yandex", "anthropic", "mistral", "sber", "whisper", "deepseek", "qwen"}, required = true)
     @NotBlank(message = "Provider is required")
     private String provider;
     
