@@ -18,11 +18,11 @@ public class NetworkCreateRequest {
     @NotBlank(message = "Display name is required")
     private String displayName;
     
-    @Schema(description = "Провайдер", example = "openai", allowableValues = {"openai", "yandex", "anthropic", "mistral", "sber", "whisper", "deepseek", "qwen"}, required = true)
+    @Schema(description = "Провайдер (любая строка, например openai, stability, midjourney, sora)", example = "openai", required = true)
     @NotBlank(message = "Provider is required")
     private String provider;
     
-    @Schema(description = "Тип нейросети", example = "chat", allowableValues = {"chat", "transcription", "embedding"}, required = true)
+    @Schema(description = "Тип нейросети", example = "chat", allowableValues = {"chat", "transcription", "embedding", "image_generation", "video_generation"}, required = true)
     @NotBlank(message = "Network type is required")
     private String networkType;
     

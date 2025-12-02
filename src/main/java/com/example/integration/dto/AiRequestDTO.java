@@ -25,7 +25,7 @@ public class AiRequestDTO {
     @Schema(
         description = "Тип запроса", 
         example = "chat",
-        allowableValues = {"chat", "transcription", "embedding"}
+        allowableValues = {"chat", "transcription", "embedding", "image_generation", "video_generation"}
     )
     private String requestType;
     
