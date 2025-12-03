@@ -2,6 +2,64 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { getNetworks, createNetwork, updateNetwork, deleteNetwork } from '../api';
 import type { NeuralNetwork, NetworkCreateRequest } from '../types';
 
+const normalizeMapping = (value: unknown): Record<string, any> => {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return typeof parsed === 'object' && parsed !== null ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof value === 'object') {
+    return value as Record<string, any>;
+  }
+  return {};
+};
+
+const buildEmptyForm = (): NetworkCreateRequest => ({
+  name: '',
+  displayName: '',
+  provider: '',
+  networkType: 'chat',
+  apiUrl: '',
+  apiKey: '',
+  modelName: '',
+  isActive: true,
+  isFree: false,
+  priority: 10,
+  timeoutSeconds: 60,
+  maxRetries: 3,
+  requestMapping: {},
+  responseMapping: {},
+  connectionInstruction: null,
+  costPerTokenRub: null,
+  wordsPerToken: null,
+  secondsPerToken: null,
+});
+
+const buildFormFromNetwork = (network: NeuralNetwork): NetworkCreateRequest => ({
+  ...buildEmptyForm(),
+  name: network.name ?? '',
+  displayName: network.displayName ?? '',
+  provider: network.provider?.toLowerCase() ?? network.name?.split('-')?.[0] ?? '',
+  networkType: network.networkType ?? 'chat',
+  apiUrl: network.apiUrl ?? '',
+  modelName: network.modelName ?? '',
+  isActive: network.isActive,
+  isFree: network.isFree,
+  priority: network.priority ?? 10,
+  timeoutSeconds: network.timeoutSeconds ?? 60,
+  maxRetries: network.maxRetries ?? 3,
+  requestMapping: normalizeMapping(network.requestMapping),
+  responseMapping: normalizeMapping(network.responseMapping),
+  connectionInstruction: network.connectionInstruction ?? null,
+  costPerTokenRub: network.costPerTokenRub ?? null,
+  wordsPerToken: network.wordsPerToken ?? null,
+  secondsPerToken: network.secondsPerToken ?? null,
+});
+
 export const NetworksManager: React.FC = () => {
   const [networks, setNetworks] = useState<NeuralNetwork[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -10,22 +68,7 @@ export const NetworksManager: React.FC = () => {
   const [editingNetwork, setEditingNetwork] = useState<NeuralNetwork | null>(null);
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
 
-  const [formData, setFormData] = useState<NetworkCreateRequest>({
-    name: '',
-    displayName: '',
-    provider: '',
-    networkType: 'chat',
-    apiUrl: '',
-    apiKey: '',
-    modelName: '',
-    isActive: true,
-    isFree: false,
-    priority: 10,
-    timeoutSeconds: 60,
-    maxRetries: 3,
-    requestMapping: {},
-    responseMapping: {},
-  });
+  const [formData, setFormData] = useState<NetworkCreateRequest>(() => buildEmptyForm());
 
   const providerSuggestions = [
     { value: 'openai', label: 'OpenAI' },
@@ -95,53 +138,43 @@ export const NetworksManager: React.FC = () => {
 
   const handleCreate = () => {
     setEditingNetwork(null);
-    setFormData({
-      name: '',
-      displayName: '',
-      provider: '',
-      networkType: 'chat',
-      apiUrl: '',
-      apiKey: '',
-      modelName: '',
-      isActive: true,
-      isFree: false,
-      priority: 10,
-      timeoutSeconds: 60,
-      maxRetries: 3,
-      requestMapping: {},
-      responseMapping: {},
-    });
+    setFormData(buildEmptyForm());
+    setShowApiKey(false);
     setIsModalOpen(true);
   };
 
   const handleEdit = (network: NeuralNetwork) => {
     setEditingNetwork(network);
-    setFormData({
-      name: network.name,
-      displayName: network.displayName,
-      provider: network.provider,
-      networkType: network.networkType,
-      apiUrl: network.apiUrl,
-      apiKey: '', // не показываем существующий ключ
-      modelName: network.modelName,
-      isActive: network.isActive,
-      isFree: network.isFree,
-      priority: network.priority,
-      timeoutSeconds: network.timeoutSeconds,
-      maxRetries: network.maxRetries,
-      requestMapping: {},
-      responseMapping: {},
-    });
+    setFormData(buildFormFromNetwork(network));
+    setShowApiKey(false);
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      return;
+    }
+    if (editingNetwork) {
+      setFormData(buildFormFromNetwork(editingNetwork));
+    } else {
+      setFormData(buildEmptyForm());
+    }
+  }, [editingNetwork, isModalOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload: NetworkCreateRequest = {
+        ...formData,
+        provider: formData.provider.trim(),
+        networkType: formData.networkType,
+        requestMapping: formData.requestMapping ?? {},
+        responseMapping: formData.responseMapping ?? {},
+      };
       if (editingNetwork) {
-        await updateNetwork(editingNetwork.id, formData);
+        await updateNetwork(editingNetwork.id, payload);
       } else {
-        await createNetwork(formData);
+        await createNetwork(payload);
       }
       setIsModalOpen(false);
       loadNetworks();
@@ -423,12 +456,64 @@ export const NetworksManager: React.FC = () => {
         }
       }
     };
+
+    const normalizedProvider = (formData.provider || '').toLowerCase().trim();
+    const isOpenAiImage = normalizedProvider === 'openai' && formData.networkType === 'image_generation';
+
+    if (isOpenAiImage) {
+      return {
+        request: {
+          prompt: 'Minimalist poster of a fox made of origami triangles',
+          size: '1024x1024',
+          quality: 'high'
+        },
+        response: {
+          data: [{ url: 'https://api.openai.com/v1/images/generated/dalle.png' }],
+          created: 1700000000
+        }
+      };
+    }
+
+    const providerExample = normalizedProvider ? examples[normalizedProvider] : null;
+    if (providerExample) {
+      return providerExample;
+    }
+
+    if (formData.networkType === 'image_generation') {
+      return {
+        request: {
+          prompt: 'Генерируй продуктовый рендер смартфона на белом фоне',
+          size: '1024x1024',
+          steps: 30
+        },
+        response: {
+          status: 'queued',
+          estimateSeconds: 25,
+          outputs: []
+        }
+      };
+    }
+
+    if (formData.networkType === 'video_generation') {
+      return {
+        request: {
+          prompt: 'Кинематографичный пролёт над футуристическим городом на рассвете',
+          duration: 10,
+          ratio: '16:9'
+        },
+        response: {
+          jobId: 'video-demo-001',
+          status: 'processing',
+          etaSeconds: 60
+        }
+      };
+    }
     
-    return examples[formData.provider] || {
+    return {
       request: { message: 'Выберите провайдера для отображения примера' },
       response: { result: 'Пример ответа появится после выбора провайдера' }
     };
-  }, [formData.provider]);
+  }, [formData.provider, formData.networkType]);
 
   if (loading) {
     return (
