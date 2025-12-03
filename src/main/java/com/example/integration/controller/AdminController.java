@@ -20,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -142,6 +143,15 @@ public class AdminController {
     ) {
         return ResponseEntity.ok(clientService.updateClient(id, request));
     }
+
+    @PostMapping("/clients/{id}/assign-user")
+    @Operation(summary = "Assign client application to user", description = "Привязывает клиентское приложение к пользователю (создаёт пользователя при необходимости)")
+    public ResponseEntity<ClientAppDTO> assignClientToUser(
+        @PathVariable UUID id,
+        @Valid @RequestBody AssignClientUserRequest request
+    ) {
+        return ResponseEntity.ok(clientService.assignClientToUser(id, request));
+    }
     
     @PostMapping("/clients/{id}/regenerate-key")
     @Operation(summary = "Regenerate API key for client")
@@ -216,8 +226,9 @@ public class AdminController {
     @GetMapping("/logs/{id}")
     @Operation(summary = "Get log by ID")
     public ResponseEntity<RequestLog> getLog(@PathVariable UUID id) {
+        UUID safeId = Objects.requireNonNull(id, "Log id is required");
         return ResponseEntity.ok(
-            requestLogRepository.findById(id)
+            requestLogRepository.findById(safeId)
                 .orElseThrow(() -> new IllegalArgumentException("Log not found"))
         );
     }
@@ -308,7 +319,7 @@ public class AdminController {
             .collect(java.util.stream.Collectors.groupingBy(log -> log.getNeuralNetwork().getId()));
         
         for (java.util.Map.Entry<java.util.UUID, java.util.List<RequestLog>> entry : logsByNetworkId.entrySet()) {
-            java.util.UUID networkId = entry.getKey();
+            java.util.UUID networkId = Objects.requireNonNull(entry.getKey(), "Network id is required");
             java.util.List<RequestLog> networkLogs = entry.getValue();
             
             com.example.integration.model.NeuralNetwork network = neuralNetworkRepository.findById(networkId).orElse(null);
@@ -379,7 +390,7 @@ public class AdminController {
             .collect(java.util.stream.Collectors.groupingBy(log -> log.getClientApp().getId()));
         
         for (java.util.Map.Entry<java.util.UUID, java.util.List<RequestLog>> entry : logsByClientId.entrySet()) {
-            java.util.UUID clientId = entry.getKey();
+            java.util.UUID clientId = Objects.requireNonNull(entry.getKey(), "Client id is required");
             java.util.List<RequestLog> clientLogs = entry.getValue();
             
             com.example.integration.model.ClientApplication client = clientApplicationRepository.findById(clientId).orElse(null);
