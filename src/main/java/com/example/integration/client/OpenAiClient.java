@@ -23,6 +23,20 @@ public class OpenAiClient extends BaseNeuralClient {
     public Map<String, Object> sendRequest(NeuralNetwork network, Map<String, Object> payload) throws Exception {
         // Применяем маппинг запроса
         Map<String, Object> requestBody = applyRequestMapping(payload, network.getRequestMapping());
+
+        // Удаляем служебные поля, которые не понимает OpenAI
+        requestBody.remove("mode");
+        Object settingsRaw = requestBody.remove("settings");
+        if (settingsRaw instanceof Map<?, ?> settingsMap) {
+            Object temperature = settingsMap.get("temperature");
+            if (temperature instanceof Number && !requestBody.containsKey("temperature")) {
+                requestBody.put("temperature", ((Number) temperature).doubleValue());
+            }
+            Object maxTokens = settingsMap.get("maxTokens");
+            if (maxTokens instanceof Number && !requestBody.containsKey("max_tokens")) {
+                requestBody.put("max_tokens", ((Number) maxTokens).intValue());
+            }
+        }
         
         // Добавляем модель, если не указана
         if (!requestBody.containsKey("model")) {
