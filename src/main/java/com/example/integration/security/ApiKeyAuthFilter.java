@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -28,9 +29,9 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     }
     
     @Override
-    protected void doFilterInternal(HttpServletRequest request, 
-                                    HttpServletResponse response, 
-                                    FilterChain filterChain) 
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain)
             throws ServletException, IOException {
         
         String requestURI = request.getRequestURI();
@@ -40,6 +41,24 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         
         if (shouldLog) {
             log.info("🔵 [ApiKeyAuthFilter] Обработка запроса: {}", requestURI);
+        }
+
+        String authorization = request.getHeader("Authorization");
+
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            if (shouldLog) {
+                log.info("🔍 [ApiKeyAuthFilter] Bearer токен присутствует, пропускаем X-API-Key аутентификацию");
+            }
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (requestURI != null && requestURI.startsWith("/api/admin/")) {
+            if (shouldLog) {
+                log.info("🔍 [ApiKeyAuthFilter] Админский endpoint, пропускаем X-API-Key аутентификацию");
+            }
+            filterChain.doFilter(request, response);
+            return;
         }
         
         String apiKey = request.getHeader("X-API-Key");
