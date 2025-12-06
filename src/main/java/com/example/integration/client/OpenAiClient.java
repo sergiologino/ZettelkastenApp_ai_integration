@@ -91,7 +91,7 @@ public class OpenAiClient extends BaseNeuralClient {
             requestBody.put("n", payload.get("n"));
         }
         if (payload.containsKey("quality")) {
-            requestBody.put("quality", payload.get("quality"));
+            requestBody.put("quality", normalizeQuality(payload.get("quality")));
         }
         if (payload.containsKey("style")) {
             requestBody.put("style", payload.get("style"));
@@ -106,7 +106,7 @@ public class OpenAiClient extends BaseNeuralClient {
             requestBody.put("size", "1024x1024");
         }
         if (settings.containsKey("quality") && !requestBody.containsKey("quality")) {
-            requestBody.put("quality", settings.get("quality"));
+            requestBody.put("quality", normalizeQuality(settings.get("quality")));
         }
         if (settings.containsKey("style") && !requestBody.containsKey("style")) {
             requestBody.put("style", settings.get("style"));
@@ -217,6 +217,23 @@ public class OpenAiClient extends BaseNeuralClient {
             return "1792x1024";
         }
         return "1024x1792";
+    }
+
+    /**
+     * Нормализует значение quality для OpenAI DALL-E API.
+     * Допустимые значения: 'standard', 'hd'.
+     * Маппинг: 'high' -> 'hd', 'low' -> 'standard', иначе без изменений.
+     */
+    private String normalizeQuality(Object qualityValue) {
+        if (qualityValue == null) {
+            return "standard";
+        }
+        String quality = String.valueOf(qualityValue).toLowerCase().trim();
+        return switch (quality) {
+            case "high", "hd" -> "hd";
+            case "low", "standard", "" -> "standard";
+            default -> "standard"; // fallback для неизвестных значений
+        };
     }
 
     private String ensurePath(String baseUrl, String defaultSuffix) {
