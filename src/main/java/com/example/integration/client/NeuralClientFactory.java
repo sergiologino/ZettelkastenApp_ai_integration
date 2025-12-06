@@ -17,6 +17,7 @@ public class NeuralClientFactory {
     private final WhisperClient whisperClient;
     private final QwenClient qwenClient;
     private final DeepSeekClient deepSeekClient;
+    private final PollinationsClient pollinationsClient;
     
     public NeuralClientFactory(
         OpenAiClient openAiClient,
@@ -26,7 +27,8 @@ public class NeuralClientFactory {
         GigaChatClient gigaChatClient,
         WhisperClient whisperClient,
         QwenClient qwenClient,
-        DeepSeekClient deepSeekClient
+        DeepSeekClient deepSeekClient,
+        PollinationsClient pollinationsClient
     ) {
         this.openAiClient = openAiClient;
         this.yandexGptClient = yandexGptClient;
@@ -36,6 +38,7 @@ public class NeuralClientFactory {
         this.whisperClient = whisperClient;
         this.qwenClient = qwenClient;
         this.deepSeekClient = deepSeekClient;
+        this.pollinationsClient = pollinationsClient;
     }
     
     /**
@@ -53,6 +56,7 @@ public class NeuralClientFactory {
             case "whisper" -> whisperClient;
             case "qwen" -> qwenClient;
             case "deepseek" -> deepSeekClient;
+            case "pollinations" -> pollinationsClient;
             default -> throw new IllegalArgumentException("Unknown provider: " + provider);
         };
     }
