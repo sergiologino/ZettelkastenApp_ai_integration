@@ -14,6 +14,7 @@
 - OAuth: OAuthCallbackController, UserAuthController, OAuthService.
 - БД: Flyway-миграции, сущности UserAccount, NeuralNetwork, ClientNetworkAccess, UserApiKey, Subscription, PaymentHistory и др.
 - Конфигурация: .env-template, application.yml; деплой через docker-compose (см. DEPLOYMENT_GUIDE.md).
+- Dockerfile: runtime-образ — `eclipse-temurin:17-jdk-jammy` (заменён устаревший `openjdk:17-jdk-slim`).
 
 ## Не в фокусе
 
