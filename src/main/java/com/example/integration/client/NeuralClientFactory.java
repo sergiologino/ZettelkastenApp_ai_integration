@@ -57,6 +57,7 @@ public class NeuralClientFactory {
             case "qwen" -> qwenClient;
             case "deepseek" -> deepSeekClient;
             case "pollinations" -> pollinationsClient;
+            case "google", "xai" -> openAiClient;
             default -> throw new IllegalArgumentException("Unknown provider: " + provider);
         };
     }
