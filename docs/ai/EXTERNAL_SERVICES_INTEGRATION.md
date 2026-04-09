@@ -1,0 +1,295 @@
+# Руководство для разработчиков и аналитиков: интеграция внешнего сервиса с AI Integration Service
+
+Документ описывает **фактический контракт** backend-а в этом репозитории (`com.example.integration`). Предполагается, что внешний сервис вызывает HTTP API по сети (не обязательно из браузера).
+
+**Базовый URL** далее обозначается как `{BASE_URL}` (например `http://localhost:8091` или `https://ai.example.com`). Порт по умолчанию в конфигурации: **8091** (`server.port` / `SERVER_PORT`).
+
+---
+
+## 1. Две модели безопасности
+
+| Роль | Как доказываем личность | Типичное использование |
+|------|---------------------------|-------------------------|
+| **Администратор** | Заголовок **`Authorization: Bearer <JWT>`** после входа | CRUD нейросетей, клиентов, доступов, просмотр логов |
+| **Клиентское приложение** (ваш сервис) | Заголовок **`X-API-Key: <ключ>`** | Вызов **`/api/ai/**`** — запросы к нейросетям |
+
+Важно:
+
+- Ключ клиента **не** заменяет логин администратора. Для первичной настройки (создать клиента, выдать доступ к сетям) нужен **JWT админа**.
+- Префикс ключа в коде: **`aikey_`** + случайная строка (см. `ClientManagementService`).
+
+---
+
+## 2. Администратор: получение JWT
+
+### 2.1. Вход
+
+```http
+POST {BASE_URL}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+```
+
+**Ответ 200** (тело, класс `AdminAuthResponse`):
+
+```json
+{
+  "token": "<JWT>",
+  "username": "admin",
+  "email": "admin@example.com"
+}
+```
+
+Дальше для всех запросов к **`/api/admin/**`**:
+
+```http
+Authorization: Bearer <JWT>
+```
+
+### 2.2. Регистрация первого администратора
+
+`POST {BASE_URL}/api/auth/register` с тем же телом `{ "username", "password" }` — **срабатывает только если в БД ещё нет администраторов**. Иначе вернётся ошибка (400 с пояснением).
+
+### 2.3. Swagger UI
+
+- UI: `{BASE_URL}/swagger-ui/index.html` (или редирект с `/swagger-ui.html`).
+- OpenAPI JSON: `{BASE_URL}/v3/api-docs`.
+
+В Swagger для админских операций используйте схему **Bearer JWT** (получите токен через `POST /api/auth/login`, затем Authorize → вставьте **`Bearer <token>`** целиком или только токен — см. `SWAGGER_AUTH_GUIDE.md` в корне репозитория).
+
+---
+
+## 3. Настройка для нового внешнего сервиса (порядок шагов)
+
+1. **Войти** как админ (раздел 2).
+2. **Создать клиента** (ваш сервис — отдельная запись «приложение»):
+
+```http
+POST {BASE_URL}/api/admin/clients
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "name": "my-service",
+  "description": "Описание для админки"
+}
+```
+
+В ответе (`ClientAppDTO`) будет поле **`apiKey`** — это значение для **`X-API-Key`** (сохраните в секретах окружения вызывающего сервиса).
+
+3. **Выдать клиенту доступ к нейросетям** (иначе оркестратор не найдёт доступную сеть для типа запроса):
+
+   - **Ко всем активным сетям сразу** (удобно для стенда):
+
+```http
+POST {BASE_URL}/api/admin/access/grant-all/{clientId}
+Authorization: Bearer <JWT>
+```
+
+   Здесь `{clientId}` — UUID из шага 2.
+
+   - Либо точечно: `POST {BASE_URL}/api/admin/access` с телом `GrantAccessRequest` (clientId, networkId, лимиты) — см. Swagger и `NetworkAccessController`.
+
+4. Убедиться, что в БД **есть активные нейросети** с заполненными URL/ключами провайдера (`GET /api/admin/networks`).
+
+После этого ваш сервис может вызывать **`/api/ai/process`** с **`X-API-Key`**.
+
+---
+
+## 4. Клиентское API: обязательные заголовки
+
+```http
+X-API-Key: aikey_xxxxxxxx
+Content-Type: application/json
+```
+
+Без валидного ключа активного клиента Spring Security вернёт **401** для путей `/api/ai/**` (после фильтрации `ApiKeyAuthFilter`).
+
+Особенность: если одновременно передан **`Authorization: Bearer ...`** (JWT), фильтр API-ключа **не подменяет** контекст — для клиентских вызовов используйте **только** `X-API-Key`, без Bearer, чтобы не получить неожиданное поведение.
+
+---
+
+## 5. Основные эндпоинты для интеграции
+
+| Метод | Путь | Авторизация | Назначение |
+|-------|------|-------------|------------|
+| POST | `/api/ai/process` | `X-API-Key` | Основной вызов нейросети |
+| GET | `/api/ai/networks/available` | `X-API-Key` | Список сетей, доступных **этому** клиенту (с учётом `client_network_access`) |
+| GET | `/api/ai/networks/{networkId}/available` | `X-API-Key` | Проверка доступа (в коде идентификатор — **логическое имя** сети, см. §6) |
+| GET | `/api/ai/networks/{networkId}/limits` | `X-API-Key` | Лимиты для сети |
+| GET | `/api/ai/health` | `X-API-Key` | Текстовый health (в `SecurityConfig` весь `/api/ai/**` требует аутентификации) |
+
+**Проверка живости без ключа** (для балансировщиков):
+
+```http
+GET {BASE_URL}/actuator/health
+```
+
+---
+
+## 6. Тело запроса `POST /api/ai/process`
+
+Тип: **`AiRequestDTO`** (JSON).
+
+| Поле | Обязательность | Описание |
+|------|------------------|----------|
+| `userId` | Да | Строковый ID конечного пользователя **во внешней системе** (для лимитов и логов; внутри создаётся/находится `ExternalUser`). |
+| `networkName` | Нет | **Имя** нейросети (`NeuralNetwork.name`), например `openai-gpt4`. Если **null/пусто** — автоматический выбор среди сетей, доступных клиенту, с фильтром по **`requestType`**. |
+| `requestType` | Условно | Например: `chat`, `transcription`, `embedding`, `image_generation`, `video_generation` — должен соответствовать типу выбранной/найденной сети. |
+| `payload` | Да | Произвольный JSON-объект; формат **зависит от провайдера** (см. §7). |
+| `metadata` | Нет | Строковый map для своих пометок. |
+
+**Важно про пути с `{networkId}`:** в `AiOrchestrationService` для проверок используется **`findByName(networkId)`** — то есть в URL ожидается **не display name**, а поле **`name`** из админки (то же значение, что в `networkName` в process).
+
+---
+
+## 7. Формат `payload` по типам (практика в коде)
+
+### 7.1. Чат (`requestType`: `chat`)
+
+Обычно передаётся структура в духе OpenAI Chat Completions, например:
+
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Привет!" }
+  ]
+}
+```
+
+Точная схема зависит от выбранного клиента (`OpenAIClient`, `YandexGptClient`, …).
+
+### 7.2. Транскрипция Whisper (`requestType`: `transcription`)
+
+Клиент `WhisperClient` ожидает в `payload`:
+
+- **`audio`** — строка **Base64** сырых байт аудио;
+- опционально **`language`**, **`prompt`**.
+
+Пример минимального фрагмента:
+
+```json
+{
+  "audio": "<BASE64>",
+  "language": "ru"
+}
+```
+
+### 7.3. Прочие типы
+
+`embedding`, `image_generation`, `video_generation` — смотрите соответствующий `*Client.java` и настройки сети в админке (`apiUrl`, `modelName`, маппинги).
+
+---
+
+## 8. Ответ `AiResponseDTO`
+
+Основные поля:
+
+| Поле | Описание |
+|------|----------|
+| `requestId` | UUID строкой — id записи в логах |
+| `status` | `success`, `failed`, при лимитах может быть сценарий с сообщением об ограничении |
+| `networkUsed` | **`name`** использованной нейросети |
+| `response` | JSON-объект от провайдера (как вернул клиент) |
+| `errorMessage` | При ошибке |
+| `executionTimeMs` | Время выполнения |
+| `tokensUsed` | Если удаётся извлечь из ответа |
+| `usageLimitInfo` | Остатки/период (часть логики завязана на `RateLimitService`) |
+
+---
+
+## 9. Ошибки и коды
+
+- **401** — нет или неверный **`X-API-Key`** (или неактивный клиент).
+- **403** — у Spring Security для неподходящей роли / запрещённый путь (`anyRequest().denyAll()` для прочих URL).
+- **400** — ошибки валидации или бизнес-проверок (например «Network not found» при неверном `networkName`).
+- Сообщения о лимитах подписок/квот могут приходить в **`status: failed`** с текстом в **`errorMessage`** без HTTP 429 — ориентируйтесь на тело **`AiResponseDTO`**.
+
+---
+
+## 10. Переменные окружения вызывающего сервиса (рекомендуемые)
+
+```env
+AI_INTEGRATION_BASE_URL=https://your-host:8091
+AI_INTEGRATION_API_KEY=aikey_...
+```
+
+Таймауты HTTP-клиента на стороне вызывающего сервиса лучше ставить **не меньше** типичного времени ответа LLM (десятки секунд).
+
+---
+
+## 11. Пример: полный сценарий через curl
+
+Переменные: `BASE`, `JWT`, `API_KEY`.
+
+```bash
+# 1) Логин админа
+curl -s -X POST "$BASE/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}'
+
+# 2) Создать клиента (подставить JWT)
+curl -s -X POST "$BASE/api/admin/clients" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"integration-test","description":"from docs"}'
+
+# 3) Выдать доступ ко всем сетям (подставить client UUID)
+curl -s -X POST "$BASE/api/admin/access/grant-all/$CLIENT_ID" \
+  -H "Authorization: Bearer $JWT"
+
+# 4) Вызов AI
+curl -s -X POST "$BASE/api/ai/process" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "external-user-1",
+    "networkName": "<name из админки>",
+    "requestType": "chat",
+    "payload": { "messages": [ { "role": "user", "content": "ping" } ] }
+  }'
+```
+
+---
+
+## 12. Связь с пользовательским API (`/api/user/**`)
+
+Для сценариев «конечный пользователь заходит через Google/Yandex, оформляет подписку, хранит свои ключи провайдера» существует отдельная зона **`/api/user/**`** (см. контроллеры `UserAuthController`, `UserClientController`, `UserApiKeyController`). Для **сервер-сервер** интеграции одного бэкенда с AI Integration **достаточно** модели **клиент + `X-API-Key`** из разделов 3–8.
+
+---
+
+## 13. Диаграмма потока (MVP)
+
+```mermaid
+sequenceDiagram
+  participant Ext as Внешний сервис
+  participant AI as AI Integration API
+  participant Prov as Провайдер LLM
+
+  Ext->>AI: POST /api/auth/login (админ, один раз для настройки)
+  AI-->>Ext: JWT
+  Ext->>AI: POST /api/admin/clients + access/grant-all (JWT)
+  AI-->>Ext: apiKey (aikey_...)
+
+  loop Запросы к нейросетям
+    Ext->>AI: POST /api/ai/process (X-API-Key)
+    AI->>Prov: HTTP по настройке сети
+    Prov-->>AI: ответ
+    AI-->>Ext: AiResponseDTO
+  end
+```
+
+---
+
+## 14. Где смотреть код при сомнениях
+
+- Контракт REST: `controller/AiController.java`, `controller/AdminController.java`, `controller/NetworkAccessController.java`, `controller/AuthController.java`.
+- Безопасность: `security/SecurityConfig.java`, `security/ApiKeyAuthFilter.java`, `security/JwtAuthFilter.java`.
+- Оркестрация и выбор сети: `service/AiOrchestrationService.java`.
+- DTO: `dto/AiRequestDTO.java`, `dto/AiResponseDTO.java`, `dto/AvailableNetworkDTO.java`.
+
+Если поведение в рантайме расходится с этим документом — **источник истины** код и OpenAPI (`/v3/api-docs`); тогда обновите **`docs/ai/CHANGELOG_AI.md`** после правок.
