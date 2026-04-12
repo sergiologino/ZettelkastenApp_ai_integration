@@ -92,6 +92,7 @@ export const NetworksManager: React.FC = () => {
   const networkTypeLabels: Record<string, string> = {
     chat: 'Чат-боты и ассистенты',
     transcription: 'Транскрибация / ASR',
+    speech_synthesis: 'Синтез речи (TTS)',
     embedding: 'Эмбеддинги',
     image_generation: 'Генерация изображений',
     video_generation: 'Генерация видео',
@@ -108,7 +109,15 @@ export const NetworksManager: React.FC = () => {
       groups[type].push(network);
     });
     Object.values(groups).forEach((items) => items.sort((a, b) => a.priority - b.priority));
-    const typeOrder = ['chat', 'transcription', 'embedding', 'image_generation', 'video_generation', 'other'];
+    const typeOrder = [
+      'chat',
+      'transcription',
+      'speech_synthesis',
+      'embedding',
+      'image_generation',
+      'video_generation',
+      'other',
+    ];
     return Object.entries(groups).sort((a, b) => {
       const idxA = typeOrder.indexOf(a[0]) !== -1 ? typeOrder.indexOf(a[0]) : typeOrder.length;
       const idxB = typeOrder.indexOf(b[0]) !== -1 ? typeOrder.indexOf(b[0]) : typeOrder.length;
@@ -508,7 +517,51 @@ export const NetworksManager: React.FC = () => {
         }
       };
     }
-    
+
+    if (formData.networkType === 'speech_synthesis') {
+      if (normalizedProvider === 'openai') {
+        return {
+          request: {
+            input: 'Пример текста для озвучки.',
+            voice: 'nova',
+            response_format: 'mp3'
+          },
+          response: {
+            audioBase64: '<base64>',
+            format: 'mp3',
+            voice: 'nova',
+            model: 'tts-1'
+          }
+        };
+      }
+      if (normalizedProvider === 'yandex') {
+        return {
+          request: {
+            text: 'Пример текста для синтеза.',
+            voice: 'alena',
+            lang: 'ru-RU',
+            format: 'oggopus'
+          },
+          response: {
+            audioBase64: '<base64>',
+            format: 'oggopus',
+            voice: 'alena',
+            lang: 'ru-RU'
+          }
+        };
+      }
+      return {
+        request: {
+          input: 'Текст для синтеза',
+          voice: 'alloy'
+        },
+        response: {
+          audioBase64: '<base64>',
+          format: 'mp3'
+        }
+      };
+    }
+
     return {
       request: { message: 'Выберите провайдера для отображения примера' },
       response: { result: 'Пример ответа появится после выбора провайдера' }
@@ -721,6 +774,7 @@ export const NetworksManager: React.FC = () => {
                     >
                       <option value="chat">Chat</option>
                       <option value="transcription">Transcription</option>
+                      <option value="speech_synthesis">Speech synthesis (TTS)</option>
                       <option value="embedding">Embedding</option>
                       <option value="image_generation">Image generation</option>
                       <option value="video_generation">Video generation</option>

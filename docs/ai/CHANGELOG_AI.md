@@ -7,3 +7,4 @@
 - **Dockerfile: замена базового образа**: `openjdk:17-jdk-slim` → `eclipse-temurin:17-jdk-jammy` (Oracle-образ удалён из Docker Hub).
 - **2026-04-09**: Исчерпывающее руководство для внешних интеграций **`EXTERNAL_SERVICES_INTEGRATION.md`** (контракт JWT + `X-API-Key`, эндпоинты, примеры).
 - **2026-04-09**: Добавлен тип **`speech_synthesis`**: OpenAI TTS (`OpenAiClient`, `/v1/audio/speech`, голос в `payload.voice`) и Yandex **SpeechKit TTS** (`YandexGptClient`, REST `tts:synthesize`, голос/язык в `payload`). Обновлены `AiRequestDTO`, `EXTERNAL_SERVICES_INTEGRATION.md` (в т.ч. пояснение по Yandex: сервис SpeechKit TTS, не отдельное имя «модели» как у YandexGPT).
+- **2026-04-12**: Миграция **V017**: сиды **`openai-tts`** и **`yandex-speechkit-tts`** (`network_type = speech_synthesis`). В админке (`NetworksManager`) в списке типов сети добавлен пункт **Speech synthesis (TTS)** — раньше тип был только в API, без строк в UI и без записей в каталоге.
