@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -28,21 +29,41 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     }
     
     @Override
-    protected void doFilterInternal(HttpServletRequest request, 
-                                    HttpServletResponse response, 
-                                    FilterChain filterChain) 
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain)
             throws ServletException, IOException {
         
         String requestURI = request.getRequestURI();
         boolean isNetworksEndpoint = requestURI != null && requestURI.contains("/networks/available");
+        boolean isAiProcessEndpoint = requestURI != null && requestURI.contains("/api/ai/process");
+        boolean shouldLog = isNetworksEndpoint || isAiProcessEndpoint;
         
-        if (isNetworksEndpoint) {
-            log.info("🔵 [ApiKeyAuthFilter] Обработка запроса к /networks/available");
+        if (shouldLog) {
+            log.info("🔵 [ApiKeyAuthFilter] Обработка запроса: {}", requestURI);
+        }
+
+        String authorization = request.getHeader("Authorization");
+
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            if (shouldLog) {
+                log.info("🔍 [ApiKeyAuthFilter] Bearer токен присутствует, пропускаем X-API-Key аутентификацию");
+            }
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (requestURI != null && requestURI.startsWith("/api/admin/")) {
+            if (shouldLog) {
+                log.info("🔍 [ApiKeyAuthFilter] Админский endpoint, пропускаем X-API-Key аутентификацию");
+            }
+            filterChain.doFilter(request, response);
+            return;
         }
         
         String apiKey = request.getHeader("X-API-Key");
         
-        if (isNetworksEndpoint) {
+        if (shouldLog) {
             log.info("🔍 [ApiKeyAuthFilter] X-API-Key header: {}", apiKey != null && !apiKey.isEmpty() ? "присутствует" : "отсутствует");
             if (apiKey != null && !apiKey.isEmpty()) {
                 log.info("🔍 [ApiKeyAuthFilter] API Key длина: {}", apiKey.length());
@@ -54,7 +75,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             Optional<ClientApplication> clientApp = clientAppRepository.findByApiKey(apiKey);
             
             if (clientApp.isPresent() && clientApp.get().getIsActive()) {
-                if (isNetworksEndpoint) {
+                if (shouldLog) {
                     log.info("✅ [ApiKeyAuthFilter] Клиент найден: {} (ID: {})", 
                         clientApp.get().getName(), clientApp.get().getId());
                 }
@@ -66,7 +87,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                     );
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } else {
-                if (isNetworksEndpoint) {
+                if (shouldLog) {
                     if (clientApp.isEmpty()) {
                         log.warn("⚠️ [ApiKeyAuthFilter] Клиент с таким API ключом не найден");
                     } else if (!clientApp.get().getIsActive()) {
@@ -75,7 +96,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                 }
             }
         } else {
-            if (isNetworksEndpoint) {
+            if (shouldLog) {
                 log.warn("⚠️ [ApiKeyAuthFilter] X-API-Key заголовок отсутствует или пуст");
             }
         }

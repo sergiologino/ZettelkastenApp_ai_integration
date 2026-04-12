@@ -18,11 +18,11 @@ public class NetworkCreateRequest {
     @NotBlank(message = "Display name is required")
     private String displayName;
     
-    @Schema(description = "Провайдер", example = "openai", allowableValues = {"openai", "yandex", "anthropic", "mistral", "sber", "whisper"}, required = true)
+    @Schema(description = "Провайдер (любая строка, например openai, stability, midjourney, sora)", example = "openai", required = true)
     @NotBlank(message = "Provider is required")
     private String provider;
     
-    @Schema(description = "Тип нейросети", example = "chat", allowableValues = {"chat", "transcription", "embedding"}, required = true)
+    @Schema(description = "Тип нейросети", example = "chat", allowableValues = {"chat", "transcription", "embedding", "image_generation", "video_generation"}, required = true)
     @NotBlank(message = "Network type is required")
     private String networkType;
     
@@ -58,5 +58,17 @@ public class NetworkCreateRequest {
     
     @Schema(description = "Маппинг полей ответа (JSON)", example = "{}")
     private Map<String, Object> responseMapping;
+    
+    @Schema(description = "Подробная инструкция по подключению с эндпоинтами и ответами", example = "Для подключения используйте...")
+    private String connectionInstruction;
+    
+    @Schema(description = "Себестоимость одного токена в рублях (курс: 1 USD = 90 RUB)", example = "0.000045")
+    private java.math.BigDecimal costPerTokenRub;
+    
+    @Schema(description = "Примерное количество слов в одном токене (для текстовых моделей)", example = "0.75")
+    private java.math.BigDecimal wordsPerToken;
+    
+    @Schema(description = "Примерное количество секунд в одном токене (для транскрибации)", example = "0.1")
+    private java.math.BigDecimal secondsPerToken;
 }
 

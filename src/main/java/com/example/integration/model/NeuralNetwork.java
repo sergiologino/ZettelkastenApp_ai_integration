@@ -30,7 +30,7 @@ public class NeuralNetwork {
     private String provider; // openai, yandex, anthropic, mistral, sber
     
     @Column(name = "network_type", nullable = false, length = 50)
-    private String networkType; // chat, transcription, embedding
+    private String networkType; // chat, transcription, embedding, speech_synthesis, ...
     
     @Column(name = "api_url", nullable = false, columnDefinition = "TEXT")
     private String apiUrl;
@@ -69,6 +69,18 @@ public class NeuralNetwork {
     
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
+    
+    @Column(name = "connection_instruction", columnDefinition = "TEXT")
+    private String connectionInstruction;
+    
+    @Column(name = "cost_per_token_rub", precision = 19, scale = 8)
+    private java.math.BigDecimal costPerTokenRub; // Себестоимость одного токена в рублях
+    
+    @Column(name = "words_per_token", precision = 10, scale = 4)
+    private java.math.BigDecimal wordsPerToken; // Примерное количество слов в одном токене (для текстовых моделей)
+    
+    @Column(name = "seconds_per_token", precision = 10, scale = 4)
+    private java.math.BigDecimal secondsPerToken; // Примерное количество секунд в одном токене (для транскрибации)
     
     @PreUpdate
     public void preUpdate() {

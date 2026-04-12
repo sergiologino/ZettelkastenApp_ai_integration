@@ -5,6 +5,7 @@ import com.example.integration.client.NeuralClientFactory;
 import com.example.integration.dto.AiRequestDTO;
 import com.example.integration.dto.AiResponseDTO;
 import com.example.integration.dto.AvailableNetworkDTO;
+import com.example.integration.tts.TtsEnrichmentService;
 import com.example.integration.model.*;
 import com.example.integration.repository.*;
 import org.slf4j.Logger;
@@ -13,7 +14,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +33,12 @@ public class AiOrchestrationService {
     private final NeuralNetworkRepository neuralNetworkRepository;
     private final ExternalUserRepository externalUserRepository;
     private final RequestLogRepository requestLogRepository;
-    private final ClientApplicationRepository clientAppRepository;
     private final NetworkAccessService networkAccessService;
+    private final SubscriptionLimitService subscriptionLimitService;
+    private final UserApiKeyService userApiKeyService;
+    private final com.example.integration.repository.UserClientLinkRepository userClientLinkRepository;
+    private final com.example.integration.repository.ClientNetworkAccessRepository clientNetworkAccessRepository;
+    private final TtsEnrichmentService ttsEnrichmentService;
     
     @Value("${ai.enable-fallback:true}")
     private boolean enableFallback;
@@ -46,15 +50,24 @@ public class AiOrchestrationService {
         ExternalUserRepository externalUserRepository,
         RequestLogRepository requestLogRepository,
         ClientApplicationRepository clientAppRepository,
-        NetworkAccessService networkAccessService
+        NetworkAccessService networkAccessService,
+        SubscriptionLimitService subscriptionLimitService,
+        UserApiKeyService userApiKeyService,
+        com.example.integration.repository.UserClientLinkRepository userClientLinkRepository,
+        com.example.integration.repository.ClientNetworkAccessRepository clientNetworkAccessRepository,
+        TtsEnrichmentService ttsEnrichmentService
     ) {
         this.clientFactory = clientFactory;
         this.rateLimitService = rateLimitService;
         this.neuralNetworkRepository = neuralNetworkRepository;
         this.externalUserRepository = externalUserRepository;
         this.requestLogRepository = requestLogRepository;
-        this.clientAppRepository = clientAppRepository;
         this.networkAccessService = networkAccessService;
+        this.subscriptionLimitService = subscriptionLimitService;
+        this.userApiKeyService = userApiKeyService;
+        this.userClientLinkRepository = userClientLinkRepository;
+        this.clientNetworkAccessRepository = clientNetworkAccessRepository;
+        this.ttsEnrichmentService = ttsEnrichmentService;
     }
     
     /**
@@ -64,33 +77,82 @@ public class AiOrchestrationService {
     public AiResponseDTO processRequest(ClientApplication clientApp, AiRequestDTO request) {
         long startTime = System.currentTimeMillis();
         
+        log.info("🚀 [AiOrchestrationService] ===== Новый AI запрос =====");
+        log.info("   Клиент: {} (ID: {})", clientApp.getName(), clientApp.getId());
+        log.info("   UserId: {}", request.getUserId());
+        log.info("   Запрошенная нейросеть: {}", request.getNetworkName() != null ? request.getNetworkName() : "автовыбор");
+        log.info("   Тип запроса: {}", request.getRequestType());
+        
         // 1. Получить или создать пользователя
         ExternalUser user = getOrCreateUser(clientApp, request.getUserId());
         
-        // 2. Выбрать нейросеть
-        NeuralNetwork network = selectNetwork(request.getNetworkName(), request.getRequestType(), user);
+        // 2. Выбрать нейросеть (с учетом доступов клиента и приоритетов из админки)
+        NeuralNetwork network = selectNetwork(clientApp, request.getNetworkName(), request.getRequestType(), user);
+        log.info("   ✅ Выбрана нейросеть: {} (ID: {}, name: {})", network.getDisplayName(), network.getId(), network.getName());
+        
+        // 2.5. Проверить лимиты подписки
+        String limitError = subscriptionLimitService.checkRequestLimit(clientApp, network);
+        if (limitError != null) {
+            // Создаем лог с ошибкой лимита
+            RequestLog requestLog = createRequestLog(clientApp, user, network, request);
+            requestLog.markFailed(limitError, 0);
+            requestLogRepository.save(requestLog);
+            
+            // Возвращаем ошибку
+            AiResponseDTO errorResponse = new AiResponseDTO();
+            errorResponse.setRequestId(requestLog.getId().toString());
+            errorResponse.setStatus("failed");
+            errorResponse.setErrorMessage(limitError);
+            errorResponse.setNetworkUsed(network.getName());
+            return errorResponse;
+        }
         
         // 3. Создать лог запроса
         RequestLog requestLog = createRequestLog(clientApp, user, network, request);
         
         try {
+            // 3.5. Получить пользовательский API ключ (если есть)
+            Optional<String> userApiKey = Optional.empty();
+            try {
+                // Пытаемся найти владельца клиента через UserClientLink
+                Optional<com.example.integration.model.UserClientLink> linkOpt = 
+                    userClientLinkRepository.findByClientApplication(clientApp.getId());
+                if (linkOpt.isPresent()) {
+                    com.example.integration.model.UserAccount owner = linkOpt.get().getUser();
+                    userApiKey = userApiKeyService.getApiKey(owner, clientApp.getId(), network.getId());
+                }
+            } catch (Exception e) {
+                // Если не удалось получить пользовательский ключ, используем системный
+                log.debug("Не удалось получить пользовательский API ключ: {}", e.getMessage());
+            }
+            
             // 4. Отправить запрос в нейросеть
             BaseNeuralClient client = clientFactory.getClient(network);
-            Map<String, Object> response = client.sendRequest(network, request.getPayload());
-            
-            // 5. Извлечь количество токенов
-            Integer tokensUsed = extractTokensFromResponse(response);
-            
-            // 6. Обновить счётчик использования
-            rateLimitService.recordUsage(user, network, tokensUsed);
-            
-            // 7. Обновить лог
-            int executionTime = (int) (System.currentTimeMillis() - startTime);
-            requestLog.markCompleted("success", response, executionTime, tokensUsed);
-            requestLogRepository.save(requestLog);
-            
-            // 8. Сформировать ответ
-            return buildResponse(requestLog.getId().toString(), network, response, tokensUsed, executionTime, user);
+            // Устанавливаем пользовательский ключ в ThreadLocal, если он есть
+            try {
+                if (userApiKey.isPresent()) {
+                    BaseNeuralClient.setUserApiKey(userApiKey.get());
+                }
+                Map<String, Object> response = client.sendRequest(network, request.getPayload());
+                ttsEnrichmentService.enrichChatResponseIfRequested(request, response);
+
+                // 5. Извлечь количество токенов
+                Integer tokensUsed = extractTokensFromResponse(response);
+                
+                // 6. Обновить счётчик использования
+                rateLimitService.recordUsage(user, network, tokensUsed);
+                
+                // 7. Обновить лог
+                int executionTime = (int) (System.currentTimeMillis() - startTime);
+                requestLog.markCompleted("success", response, executionTime, tokensUsed);
+                requestLogRepository.save(requestLog);
+                
+                // 8. Сформировать ответ
+                return buildResponse(requestLog.getId().toString(), network, response, tokensUsed, executionTime, user);
+            } finally {
+                // Очищаем пользовательский ключ из ThreadLocal
+                BaseNeuralClient.clearUserApiKey();
+            }
             
         } catch (Exception e) {
             log.error("Error processing AI request", e);
@@ -139,20 +201,53 @@ public class AiOrchestrationService {
             });
     }
     
-    private NeuralNetwork selectNetwork(String networkName, String requestType, ExternalUser user) {
+    private NeuralNetwork selectNetwork(ClientApplication clientApp, String networkName, String requestType, ExternalUser user) {
         NeuralNetwork network;
         
         if (networkName != null && !networkName.isEmpty()) {
             // Пользователь указал конкретную нейросеть
-            network = neuralNetworkRepository.findByName(networkName)
-                .orElseThrow(() -> new IllegalArgumentException("Network not found: " + networkName));
+            log.info("   🔍 Ищем нейросеть по имени: '{}'", networkName);
+            Optional<NeuralNetwork> networkOpt = neuralNetworkRepository.findByName(networkName);
+            if (networkOpt.isEmpty()) {
+                log.error("   ❌ Нейросеть с именем '{}' не найдена в БД", networkName);
+                // Покажем все доступные нейросети для диагностики
+                List<NeuralNetwork> allNetworks = neuralNetworkRepository.findAll();
+                log.info("   📋 Всего нейросетей в БД: {}", allNetworks.size());
+                allNetworks.forEach(n -> {
+                    log.info("      - name: '{}', displayName: '{}', id: {}, active: {}", 
+                        n.getName(), n.getDisplayName(), n.getId(), n.getIsActive());
+                });
+                throw new IllegalArgumentException("Network not found: " + networkName);
+            }
+            network = networkOpt.get();
+            log.info("   ✅ Найдена нейросеть: {} (name: '{}', id: {})", network.getDisplayName(), network.getName(), network.getId());
         } else {
-            // Автоматический выбор по типу запроса и приоритету
-            network = neuralNetworkRepository.findByTypeOrderedByPriority(requestType)
-                .stream()
-                .filter(n -> n.getIsActive() && rateLimitService.isNetworkAvailable(user, n))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No available network for type: " + requestType));
+            // Автоматический выбор из доступных нейросетей клиента с учетом приоритетов из админки
+            log.info("   🔍 Автовыбор нейросети для типа: {} из доступных для клиента {}", requestType, clientApp.getName());
+            
+            // Получаем все доступы клиента, отсортированные по приоритету (меньше = выше приоритет)
+            // Используем прямой запрос к репозиторию для получения доступа с приоритетами
+            List<com.example.integration.model.ClientNetworkAccess> clientAccesses = 
+                clientNetworkAccessRepository.findByClientApplicationOrderByPriorityAsc(clientApp)
+                    .stream()
+                    .filter(access -> access.getNeuralNetwork().getIsActive())
+                    .filter(access -> {
+                        // Фильтруем по типу запроса
+                        String networkType = access.getNeuralNetwork().getNetworkType();
+                        return networkType != null && networkType.equalsIgnoreCase(requestType);
+                    })
+                    .filter(access -> rateLimitService.isNetworkAvailable(user, access.getNeuralNetwork()))
+                    .collect(java.util.stream.Collectors.toList());
+            
+            if (clientAccesses.isEmpty()) {
+                log.error("   ❌ Нет доступных нейросетей для клиента {} типа {}", clientApp.getName(), requestType);
+                throw new IllegalStateException("No available network for client " + clientApp.getName() + " and type: " + requestType);
+            }
+            
+            network = clientAccesses.get(0).getNeuralNetwork();
+            Integer priority = clientAccesses.get(0).getPriority();
+            log.info("   ✅ Автоматически выбрана нейросеть: {} (name: '{}', id: {}, priority: {})", 
+                network.getDisplayName(), network.getName(), network.getId(), priority);
         }
         
         // Проверяем доступность
@@ -180,10 +275,10 @@ public class AiOrchestrationService {
     }
     
     private Integer extractTokensFromResponse(Map<String, Object> response) {
-        if (response.containsKey("usage")) {
-            Map<String, Object> usage = (Map<String, Object>) response.get("usage");
-            if (usage.containsKey("total_tokens")) {
-                return ((Number) usage.get("total_tokens")).intValue();
+        if (response.containsKey("usage") && response.get("usage") instanceof Map<?, ?> usage) {
+            Object totalTokens = usage.get("total_tokens");
+            if (totalTokens instanceof Number n) {
+                return n.intValue();
             }
         }
         return 0;
@@ -346,6 +441,22 @@ public class AiOrchestrationService {
         limits.put("remainingRequestsMonth", null); // Пока не реализовано
         limits.put("hasLimits", false); // Пока не реализовано
         
+        return limits;
+    }
+
+    public Map<String, Object> getClientNetworkLimits(ClientApplication clientApp, String networkId) {
+        Map<String, Object> limits = new HashMap<>();
+        limits.put("networkId", networkId);
+
+        networkAccessService.getClientNetworkAccess(clientApp.getId(), networkId).ifPresent(access -> {
+            limits.put("networkName", access.getNetworkName());
+            limits.put("remainingRequestsToday", access.getDailyRequestLimit());
+            limits.put("remainingRequestsMonth", access.getMonthlyRequestLimit());
+            boolean hasDaily = access.getDailyRequestLimit() != null && access.getDailyRequestLimit() > 0;
+            boolean hasMonthly = access.getMonthlyRequestLimit() != null && access.getMonthlyRequestLimit() > 0;
+            limits.put("hasLimits", hasDaily || hasMonthly);
+        });
+
         return limits;
     }
     

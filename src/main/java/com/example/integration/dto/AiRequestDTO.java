@@ -25,7 +25,7 @@ public class AiRequestDTO {
     @Schema(
         description = "Тип запроса", 
         example = "chat",
-        allowableValues = {"chat", "transcription", "embedding"}
+        allowableValues = {"chat", "transcription", "embedding", "image_generation", "video_generation", "speech_synthesis"}
     )
     private String requestType;
     
@@ -36,8 +36,8 @@ public class AiRequestDTO {
     private Map<String, Object> payload;
     
     @Schema(
-        description = "Дополнительные метаданные",
-        example = "{\"source\": \"web\", \"version\": \"1.0\"}"
+        description = "Дополнительные метаданные (например synthesizeTts=true, ttsVoice=calm для озвучки ответа чата через Qwen3-TTS)",
+        example = "{\"source\": \"web\", \"version\": \"1.0\", \"synthesizeTts\": \"true\", \"ttsVoice\": \"default\"}"
     )
     private Map<String, String> metadata;
 }

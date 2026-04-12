@@ -75,6 +75,10 @@ public class NetworkManagementService {
         network.setMaxRetries(request.getMaxRetries());
         network.setRequestMapping(request.getRequestMapping());
         network.setResponseMapping(request.getResponseMapping());
+        network.setConnectionInstruction(request.getConnectionInstruction());
+        network.setCostPerTokenRub(request.getCostPerTokenRub());
+        network.setWordsPerToken(request.getWordsPerToken());
+        network.setSecondsPerToken(request.getSecondsPerToken());
         
         network = neuralNetworkRepository.save(network);
         return toDTO(network);
@@ -108,6 +112,10 @@ public class NetworkManagementService {
         network.setMaxRetries(request.getMaxRetries());
         network.setRequestMapping(request.getRequestMapping());
         network.setResponseMapping(request.getResponseMapping());
+        network.setConnectionInstruction(request.getConnectionInstruction());
+        network.setCostPerTokenRub(request.getCostPerTokenRub());
+        network.setWordsPerToken(request.getWordsPerToken());
+        network.setSecondsPerToken(request.getSecondsPerToken());
         
         network = neuralNetworkRepository.save(network);
         return toDTO(network);
@@ -137,6 +145,10 @@ public class NetworkManagementService {
         dto.setMaxRetries(network.getMaxRetries());
         dto.setRequestMapping(network.getRequestMapping());
         dto.setResponseMapping(network.getResponseMapping());
+        dto.setConnectionInstruction(network.getConnectionInstruction());
+        dto.setCostPerTokenRub(network.getCostPerTokenRub());
+        dto.setWordsPerToken(network.getWordsPerToken());
+        dto.setSecondsPerToken(network.getSecondsPerToken());
         dto.setCreatedAt(network.getCreatedAt());
         dto.setUpdatedAt(network.getUpdatedAt());
         return dto;

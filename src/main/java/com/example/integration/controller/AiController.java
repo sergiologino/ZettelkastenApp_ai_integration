@@ -229,20 +229,26 @@ public class AiController {
             )
         }
     )
-    public ResponseEntity<Map<String, Object>> checkNetworkAvailability(@PathVariable String networkId) {
-        // TODO: Добавить авторизацию через X-API-Key
-        boolean isAvailable = aiOrchestrationService.isNetworkAvailable(networkId);
-        
+    public ResponseEntity<Map<String, Object>> checkNetworkAvailability(@PathVariable String networkId,
+                                                                        Authentication authentication) {
         Map<String, Object> response = new HashMap<>();
         response.put("networkId", networkId);
-        response.put("available", isAvailable);
-        
-        if (isAvailable) {
-            // Получаем информацию о лимитах
-            Map<String, Object> limits = aiOrchestrationService.getNetworkLimits(networkId);
-            response.put("limits", limits);
+
+        if (authentication != null && authentication.getPrincipal() instanceof ClientApplication clientApp) {
+            boolean availableForClient = aiOrchestrationService.isNetworkAvailableForClient(clientApp, networkId);
+            response.put("available", availableForClient);
+            if (availableForClient) {
+                response.put("limits", aiOrchestrationService.getClientNetworkLimits(clientApp, networkId));
+            }
+        } else {
+            // публичная проверка, без учёта конкретного клиента
+            boolean isAvailable = aiOrchestrationService.isNetworkAvailable(networkId);
+            response.put("available", isAvailable);
+            if (isAvailable) {
+                response.put("limits", aiOrchestrationService.getNetworkLimits(networkId));
+            }
         }
-        
+
         return ResponseEntity.ok(response);
     }
     
@@ -312,9 +318,14 @@ public class AiController {
             )
         }
     )
-    public ResponseEntity<Map<String, Object>> getNetworkLimits(@PathVariable String networkId) {
-        // TODO: Добавить авторизацию через X-API-Key
-        Map<String, Object> limits = aiOrchestrationService.getNetworkLimits(networkId);
+    public ResponseEntity<Map<String, Object>> getNetworkLimits(@PathVariable String networkId,
+                                                                Authentication authentication) {
+        Map<String, Object> limits;
+        if (authentication != null && authentication.getPrincipal() instanceof ClientApplication clientApp) {
+            limits = aiOrchestrationService.getClientNetworkLimits(clientApp, networkId);
+        } else {
+            limits = aiOrchestrationService.getNetworkLimits(networkId);
+        }
         return ResponseEntity.ok(limits);
     }
     

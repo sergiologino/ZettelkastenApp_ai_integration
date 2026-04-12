@@ -34,6 +34,12 @@ public interface ClientNetworkAccessRepository extends JpaRepository<ClientNetwo
      * Получить все доступы для конкретного клиента
      */
     List<ClientNetworkAccess> findByClientApplicationOrderByNeuralNetworkDisplayNameAsc(ClientApplication clientApplication);
+    
+    /**
+     * Получить все доступы для конкретного клиента, отсортированные по приоритету (меньше = выше приоритет)
+     */
+    @Query("SELECT cna FROM ClientNetworkAccess cna WHERE cna.clientApplication = :client ORDER BY COALESCE(cna.priority, 100) ASC, cna.neuralNetwork.displayName ASC")
+    List<ClientNetworkAccess> findByClientApplicationOrderByPriorityAsc(@Param("client") ClientApplication clientApplication);
 
     /**
      * Получить все доступы для конкретной нейросети

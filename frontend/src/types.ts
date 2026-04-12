@@ -26,6 +26,12 @@ export interface NeuralNetwork {
   maxRetries: number;
   createdAt: string;
   updatedAt: string;
+  requestMapping?: Record<string, any> | null;
+  responseMapping?: Record<string, any> | null;
+  connectionInstruction?: string | null;
+  costPerTokenRub?: number | string | null;
+  wordsPerToken?: number | string | null;
+  secondsPerToken?: number | string | null;
 }
 
 export interface NetworkCreateRequest {
@@ -43,6 +49,10 @@ export interface NetworkCreateRequest {
   maxRetries: number;
   requestMapping: Record<string, any>;
   responseMapping: Record<string, any>;
+  connectionInstruction?: string | null;
+  costPerTokenRub?: number | string | null;
+  wordsPerToken?: number | string | null;
+  secondsPerToken?: number | string | null;
 }
 
 export interface ClientApplication {

@@ -13,6 +13,9 @@ import java.util.Map;
  */
 public abstract class BaseNeuralClient {
     
+    // ThreadLocal для передачи пользовательского API ключа
+    private static final ThreadLocal<String> userApiKeyHolder = new ThreadLocal<>();
+    
     protected final RestTemplate restTemplate;
     protected final ObjectMapper objectMapper;
     protected final EncryptionService encryptionService;
@@ -36,14 +39,37 @@ public abstract class BaseNeuralClient {
     ) throws Exception;
     
     /**
+     * Установить пользовательский API ключ для текущего потока
+     */
+    public static void setUserApiKey(String userApiKey) {
+        if (userApiKey != null && !userApiKey.isEmpty()) {
+            userApiKeyHolder.set(userApiKey);
+        } else {
+            userApiKeyHolder.remove();
+        }
+    }
+    
+    /**
+     * Очистить пользовательский API ключ для текущего потока
+     */
+    public static void clearUserApiKey() {
+        userApiKeyHolder.remove();
+    }
+    
+    /**
      * Подготовка заголовков запроса
+     * Сначала проверяет пользовательский ключ из ThreadLocal, затем системный
      */
     protected HttpHeaders prepareHeaders(NeuralNetwork network) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         
-        if (network.getApiKeyEncrypted() != null && !network.getApiKeyEncrypted().isEmpty()) {
-            // ✅ Расшифровываем API ключ перед использованием
+        // Сначала используем пользовательский ключ из ThreadLocal, если он есть
+        String userApiKey = userApiKeyHolder.get();
+        if (userApiKey != null && !userApiKey.isEmpty()) {
+            headers.set("Authorization", "Bearer " + userApiKey);
+        } else if (network.getApiKeyEncrypted() != null && !network.getApiKeyEncrypted().isEmpty()) {
+            // ✅ Расшифровываем системный API ключ перед использованием
             String decryptedKey = encryptionService.decrypt(network.getApiKeyEncrypted());
             headers.set("Authorization", "Bearer " + decryptedKey);
         }
