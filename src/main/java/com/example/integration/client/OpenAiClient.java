@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,10 @@ public class OpenAiClient extends BaseNeuralClient {
         // Удаляем служебные поля
         Object settingsRaw = mappedPayload.remove("settings");
         mappedPayload.remove("mode");
+
+        if ("speech_synthesis".equalsIgnoreCase(network.getNetworkType())) {
+            return sendSpeechSynthesisRequest(network, mappedPayload);
+        }
 
         if ("image_generation".equalsIgnoreCase(network.getNetworkType())) {
             return sendImageGenerationRequest(network, mappedPayload, settingsRaw);
@@ -69,6 +74,67 @@ public class OpenAiClient extends BaseNeuralClient {
 
         Map<String, Object> responseBody = response.getBody();
         return applyResponseMapping(responseBody, network.getResponseMapping());
+    }
+
+    /**
+     * OpenAI Text-to-Speech: {@code POST /v1/audio/speech}
+     * <a href="https://platform.openai.com/docs/api-reference/audio/createSpeech">API reference</a>
+     */
+    private Map<String, Object> sendSpeechSynthesisRequest(NeuralNetwork network, Map<String, Object> payload) throws Exception {
+        String input = extractSpeechInput(payload);
+        if (input == null || input.isBlank()) {
+            throw new IllegalArgumentException("Payload must include non-empty \"input\" or \"text\" for OpenAI speech synthesis.");
+        }
+
+        String voice = payload.containsKey("voice") ? String.valueOf(payload.get("voice")).trim() : "alloy";
+        String model = resolveModel(payload, network, "tts-1");
+        String responseFormat = payload.containsKey("response_format")
+            ? String.valueOf(payload.get("response_format"))
+            : "mp3";
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", model);
+        body.put("input", input);
+        body.put("voice", voice);
+        body.put("response_format", responseFormat);
+
+        HttpHeaders headers = prepareHeaders(network);
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        String url = ensurePath(network.getApiUrl(), "/audio/speech");
+        Objects.requireNonNull(url, "Resolved OpenAI TTS endpoint is null");
+
+        ResponseEntity<byte[]> response = restTemplate.exchange(
+            url,
+            HttpMethod.POST,
+            request,
+            byte[].class
+        );
+
+        byte[] audio = response.getBody();
+        String audioBase64 = audio != null && audio.length > 0
+            ? Base64.getEncoder().encodeToString(audio)
+            : "";
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("audioBase64", audioBase64);
+        result.put("format", responseFormat);
+        result.put("voice", voice);
+        result.put("model", model);
+        result.put("provider", "openai");
+        return applyResponseMapping(result, network.getResponseMapping());
+    }
+
+    private static String extractSpeechInput(Map<String, Object> payload) {
+        if (payload.containsKey("input")) {
+            Object v = payload.get("input");
+            return v != null ? String.valueOf(v) : null;
+        }
+        if (payload.containsKey("text")) {
+            Object v = payload.get("text");
+            return v != null ? String.valueOf(v) : null;
+        }
+        return null;
     }
 
     private Map<String, Object> sendImageGenerationRequest(

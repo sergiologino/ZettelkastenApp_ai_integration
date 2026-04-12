@@ -139,7 +139,7 @@ GET {BASE_URL}/actuator/health
 |------|------------------|----------|
 | `userId` | Да | Строковый ID конечного пользователя **во внешней системе** (для лимитов и логов; внутри создаётся/находится `ExternalUser`). |
 | `networkName` | Нет | **Имя** нейросети (`NeuralNetwork.name`), например `openai-gpt4`. Если **null/пусто** — автоматический выбор среди сетей, доступных клиенту, с фильтром по **`requestType`**. |
-| `requestType` | Условно | Например: `chat`, `transcription`, `embedding`, `image_generation`, `video_generation` — должен соответствовать типу выбранной/найденной сети. |
+| `requestType` | Условно | Например: `chat`, `transcription`, `speech_synthesis`, `embedding`, `image_generation`, `video_generation` — должен соответствовать типу выбранной/найденной сети. |
 | `payload` | Да | Произвольный JSON-объект; формат **зависит от провайдера** (см. §7). |
 | `metadata` | Нет | Строковый map для своих пометок. |
 
@@ -179,7 +179,43 @@ GET {BASE_URL}/actuator/health
 }
 ```
 
-### 7.3. Прочие типы
+### 7.3. Синтез речи OpenAI TTS (`requestType`: `speech_synthesis`)
+
+В админке у нейросети: **`provider`**: `openai`, **`networkType`**: `speech_synthesis`, **`apiUrl`**: база OpenAI (как у чата), например `https://api.openai.com/v1`, **`modelName`**: по умолчанию `tts-1` или `tts-1-hd` (можно переопределить в `payload.model`).
+
+Клиент: `OpenAiClient` → HTTP `POST /v1/audio/speech`. Используется тот же API-ключ OpenAI, что и для остальных моделей OpenAI.
+
+В **`payload`**:
+
+| Поле | Обязательность | Описание |
+|------|----------------|----------|
+| `input` или `text` | Да | Текст для озвучки |
+| `voice` | Нет | Голос: `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer` (и другие, поддерживаемые OpenAI) |
+| `response_format` | Нет | Например `mp3`, `opus`, `aac`, `flac`, `wav`, `pcm` (по умолчанию в коде: `mp3`) |
+| `model` | Нет | Переопределение модели TTS, если не хватает `modelName` в нейросети |
+
+Ответ в `response`: объект с полем **`audioBase64`** (аудио в Base64), **`format`**, **`voice`**, **`model`**.
+
+### 7.4. Синтез речи Yandex SpeechKit (`requestType`: `speech_synthesis`)
+
+В **документации Yandex Cloud** синтез речи относится к продукту **SpeechKit TTS** (сервис синтеза речи). Отдельного идентификатора «модели» в формате YandexGPT (`gpt://.../latest`) для TTS **нет**: задаются **язык** (`lang`), **голос** (`voice`) и **формат** аудио. Доступны **REST API v1** (`speech/v1/tts:synthesize`) и **API v3** (gRPC/REST); в этом сервисе реализован вызов **REST v1** по умолчанию `https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize`.
+
+В админке: **`provider`**: `yandex`, **`networkType`**: `speech_synthesis`, **`apiUrl`**: можно оставить URL от YandexGPT — для TTS он будет проигнорирован и подставится endpoint SpeechKit (если в `apiUrl` не указан полный путь с `tts:synthesize`). **`modelName`** для TTS не используется так же, как для GPT; голос задаётся в запросе.
+
+Подключение: **тот же API-ключ Yandex Cloud**, что и для Yandex GPT (`Authorization: Api-Key`).
+
+В **`payload`**:
+
+| Поле | Обязательность | Описание |
+|------|----------------|----------|
+| `text` или `input` | Да | Текст для синтеза |
+| `voice` | Нет | Идентификатор голоса SpeechKit, напр. `alena`, `filipp`, `ermil`, `jane`, … (см. [список голосов](https://yandex.cloud/ru/docs/speechkit/tts/voices)) |
+| `lang` | Нет | Язык, напр. `ru-RU`, `en-US` (по умолчанию `ru-RU`) |
+| `format` | Нет | `oggopus`, `lpcm`, `mp3`, … (по умолчанию `oggopus`) |
+
+Ответ в `response`: **`audioBase64`**, **`format`**, **`lang`**, **`voice`**.
+
+### 7.5. Прочие типы
 
 `embedding`, `image_generation`, `video_generation` — смотрите соответствующий `*Client.java` и настройки сети в админке (`apiUrl`, `modelName`, маппинги).
 

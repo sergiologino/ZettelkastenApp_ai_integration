@@ -64,6 +64,12 @@ ai:
   request-timeout: ${AI_REQUEST_TIMEOUT:60}
   max-retries: ${AI_MAX_RETRIES:3}
   enable-fallback: ${AI_ENABLE_FALLBACK:true}
+  # Озвучка ответа чата через локальный Qwen3-TTS (см. AltaPens docker/tts-qwen).
+  tts:
+    enabled: ${AI_TTS_ENABLED:false}
+    base-url: ${AI_TTS_BASE_URL:http://127.0.0.1:8000}
+    connect-timeout-ms: ${AI_TTS_CONNECT_TIMEOUT_MS:5000}
+    read-timeout-ms: ${AI_TTS_READ_TIMEOUT_MS:180000}
   
 # Logging
 logging:

@@ -5,6 +5,7 @@ import com.example.integration.client.NeuralClientFactory;
 import com.example.integration.dto.AiRequestDTO;
 import com.example.integration.dto.AiResponseDTO;
 import com.example.integration.dto.AvailableNetworkDTO;
+import com.example.integration.tts.TtsEnrichmentService;
 import com.example.integration.model.*;
 import com.example.integration.repository.*;
 import org.slf4j.Logger;
@@ -37,6 +38,7 @@ public class AiOrchestrationService {
     private final UserApiKeyService userApiKeyService;
     private final com.example.integration.repository.UserClientLinkRepository userClientLinkRepository;
     private final com.example.integration.repository.ClientNetworkAccessRepository clientNetworkAccessRepository;
+    private final TtsEnrichmentService ttsEnrichmentService;
     
     @Value("${ai.enable-fallback:true}")
     private boolean enableFallback;
@@ -52,7 +54,8 @@ public class AiOrchestrationService {
         SubscriptionLimitService subscriptionLimitService,
         UserApiKeyService userApiKeyService,
         com.example.integration.repository.UserClientLinkRepository userClientLinkRepository,
-        com.example.integration.repository.ClientNetworkAccessRepository clientNetworkAccessRepository
+        com.example.integration.repository.ClientNetworkAccessRepository clientNetworkAccessRepository,
+        TtsEnrichmentService ttsEnrichmentService
     ) {
         this.clientFactory = clientFactory;
         this.rateLimitService = rateLimitService;
@@ -64,6 +67,7 @@ public class AiOrchestrationService {
         this.userApiKeyService = userApiKeyService;
         this.userClientLinkRepository = userClientLinkRepository;
         this.clientNetworkAccessRepository = clientNetworkAccessRepository;
+        this.ttsEnrichmentService = ttsEnrichmentService;
     }
     
     /**
@@ -130,7 +134,8 @@ public class AiOrchestrationService {
                     BaseNeuralClient.setUserApiKey(userApiKey.get());
                 }
                 Map<String, Object> response = client.sendRequest(network, request.getPayload());
-                
+                ttsEnrichmentService.enrichChatResponseIfRequested(request, response);
+
                 // 5. Извлечь количество токенов
                 Integer tokensUsed = extractTokensFromResponse(response);
                 

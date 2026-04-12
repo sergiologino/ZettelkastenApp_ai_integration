@@ -30,7 +30,7 @@ public class NeuralNetwork {
     private String provider; // openai, yandex, anthropic, mistral, sber
     
     @Column(name = "network_type", nullable = false, length = 50)
-    private String networkType; // chat, transcription, embedding
+    private String networkType; // chat, transcription, embedding, speech_synthesis, ...
     
     @Column(name = "api_url", nullable = false, columnDefinition = "TEXT")
     private String apiUrl;
