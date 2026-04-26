@@ -122,7 +122,7 @@ Content-Type: application/json
 | GET | `/api/ai/networks/{networkId}/available` | `X-API-Key` | Проверка доступа (в коде идентификатор — **логическое имя** сети, см. §6) |
 | GET | `/api/ai/networks/{networkId}/limits` | `X-API-Key` | Лимиты для сети |
 | GET | `/api/ai/health` | `X-API-Key` | Текстовый health (в `SecurityConfig` весь `/api/ai/**` требует аутентификации) |
-| POST | `/api/social/posts` | `X-API-Key` | Публикация текстового поста в Telegram, Facebook или X |
+| POST | `/api/social/posts` | `X-API-Key` | Публикация поста в Telegram, Facebook или X; для Telegram поддержаны файлы/медиа |
 
 **Проверка живости без ключа** (для балансировщиков):
 
@@ -303,7 +303,7 @@ X-API-Key: aikey_xxxxxxxx
 Content-Type: application/json
 ```
 
-Общий формат:
+Общий формат одного запроса со всем постом:
 
 ```json
 {
@@ -314,21 +314,56 @@ Content-Type: application/json
     "botToken": "<telegram bot token>",
     "chatId": "<telegram chat id>"
   },
+  "attachments": [
+    {
+      "type": "image",
+      "fileName": "photo.jpg",
+      "contentType": "image/jpeg",
+      "base64": "<BASE64>"
+    },
+    {
+      "type": "document",
+      "fileName": "report.pdf",
+      "contentType": "application/pdf",
+      "base64": "<BASE64>"
+    }
+  ],
   "options": {
     "parseMode": "HTML"
   }
 }
 ```
 
+`text` может быть пустым, если есть `attachments[]`; тогда будет опубликован только файл/медиа. Для Telegram `text` используется как caption первого вложения, если у самого вложения не задан `caption`.
+
 Поддерживаемые платформы:
 
-| platform | credentials | options |
-|----------|-------------|---------|
-| `telegram` | `botToken`, `chatId` | `parseMode`, `disableWebPagePreview` |
-| `facebook` | `accessToken`, `pageId` | `link` |
-| `x` | `bearerToken` | `replyToTweetId` |
+| platform | credentials | attachments | options |
+|----------|-------------|-------------|---------|
+| `telegram` | `botToken`, `chatId` | `image`/`photo`, `video`, `document`/`file`; `base64` или `url` | `parseMode`, `disableWebPagePreview` |
+| `facebook` | `accessToken`, `pageId` | пока не поддержаны; при `attachments[]` вернётся `failed` | `link` |
+| `x` | `bearerToken` | пока не поддержаны; при `attachments[]` вернётся `failed` | `replyToTweetId` |
+
+Формат элемента `attachments[]`:
+
+| Поле | Обязательность | Описание |
+|------|----------------|----------|
+| `type` | Да | `image`/`photo`, `video`, `document`/`file`. |
+| `fileName` | Желательно для `base64` | Имя файла в multipart-загрузке. |
+| `contentType` | Нет | MIME-тип для клиента/логов; содержимое файла по нему не валидируется. |
+| `base64` или `url` | Да, ровно одно | Содержимое файла в Base64 (допускается `data:*;base64,...`) или публичный URL, если провайдер умеет загрузку по URL. |
+| `caption` | Нет | Caption конкретного файла. Если не задан, для первого вложения используется общий `text`. |
+
+Для Telegram:
+
+- без `attachments[]` вызывается `sendMessage`;
+- одно изображение/видео/документ отправляется через `sendPhoto`, `sendVideo` или `sendDocument`;
+- несколько вложений отправляются через `sendMediaGroup`;
+- наборы больше 10 элементов разбиваются на несколько групп, т.к. это ограничение Telegram Bot API;
+- документы отделяются от фото/видео при групповой отправке, чтобы соответствовать ограничениям Telegram.
 
 Секреты из `credentials` используются только для транзитного HTTP-вызова провайдера и **не сохраняются** в `request_logs`; в лог пишутся только имена переданных credential-полей. Результаты логируются с `request_type = social_post:<platform>`.
+Содержимое `attachments[].base64` и полный `attachments[].url` также не сохраняются; в логах остаются только метаданные (`type`, `fileName`, `contentType`, источник вложения).
 
 Ответ:
 
