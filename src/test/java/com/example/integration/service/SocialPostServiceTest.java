@@ -95,6 +95,46 @@ class SocialPostServiceTest {
     }
 
     @Test
+    void publishesTelegramPhotoAttachmentWithoutPersistingFileContent() {
+        ClientApplication client = client("client-a");
+        ExternalUser user = user(client, "external-user-1");
+        SocialPostRequestDTO request = telegramPhotoRequest();
+
+        when(externalUserRepository.findByClientAppAndExternalUserId(client, "external-user-1"))
+            .thenReturn(Optional.of(user));
+        when(requestLogRepository.save(any(RequestLog.class)))
+            .thenAnswer(invocation -> {
+                RequestLog log = invocation.getArgument(0);
+                if (log.getId() == null) {
+                    log.setId(UUID.randomUUID());
+                }
+                return log;
+            });
+
+        server.expect(requestTo("https://api.telegram.org/bottelegram-token/sendPhoto"))
+            .andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess("""
+                {
+                  "ok": true,
+                  "result": {
+                    "message_id": 43
+                  }
+                }
+                """, MediaType.APPLICATION_JSON));
+
+        SocialPostResponseDTO response = service.publish(client, request);
+
+        assertThat(response.getStatus()).isEqualTo("success");
+        assertThat(response.getProviderPostId()).isEqualTo("43");
+
+        ArgumentCaptor<RequestLog> logCaptor = ArgumentCaptor.forClass(RequestLog.class);
+        verify(requestLogRepository, atLeastOnce()).save(logCaptor.capture());
+        Map<String, Object> savedPayload = logCaptor.getAllValues().get(0).getRequestPayload();
+        assertThat(savedPayload.toString()).contains("photo.jpg");
+        assertThat(savedPayload.toString()).doesNotContain("aGVsbG8=");
+    }
+
+    @Test
     void aggregatesSocialPostStatsByPlatform() {
         RequestLog telegramSuccess = log("social_post:telegram", "success");
         RequestLog xFailed = log("social_post:x", "failed");
@@ -120,6 +160,17 @@ class SocialPostServiceTest {
             "chatId", "chat-1"
         ));
         request.setOptions(Map.of("parseMode", "HTML"));
+        return request;
+    }
+
+    private SocialPostRequestDTO telegramPhotoRequest() {
+        SocialPostRequestDTO request = telegramRequest();
+        SocialPostRequestDTO.Attachment attachment = new SocialPostRequestDTO.Attachment();
+        attachment.setType("image");
+        attachment.setFileName("photo.jpg");
+        attachment.setContentType("image/jpeg");
+        attachment.setBase64("aGVsbG8=");
+        request.setAttachments(List.of(attachment));
         return request;
     }
 
