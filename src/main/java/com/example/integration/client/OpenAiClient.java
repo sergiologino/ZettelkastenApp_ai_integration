@@ -13,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -305,7 +306,7 @@ public class OpenAiClient extends BaseNeuralClient {
     private String ensurePath(String baseUrl, String defaultSuffix) {
         String normalizedBase = (baseUrl == null || baseUrl.isBlank())
             ? "https://api.openai.com/v1"
-            : baseUrl;
+            : ensureUrlHasScheme(baseUrl.trim());
 
         if (normalizedBase.endsWith(defaultSuffix)) {
             return normalizedBase;
@@ -314,6 +315,20 @@ public class OpenAiClient extends BaseNeuralClient {
             return normalizedBase + defaultSuffix.substring(1);
         }
         return normalizedBase + defaultSuffix;
+    }
+
+    /**
+     * В БД иногда сохраняют {@code api.openai.com/v1} без {@code https://} — тогда RestTemplate падает с «URI with undefined scheme».
+     */
+    private static String ensureUrlHasScheme(String url) {
+        if (url.contains("://")) {
+            return url;
+        }
+        String lower = url.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("localhost") || lower.startsWith("127.0.0.1")) {
+            return "http://" + url;
+        }
+        return "https://" + url;
     }
 }
 

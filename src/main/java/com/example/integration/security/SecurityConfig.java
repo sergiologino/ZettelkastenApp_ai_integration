@@ -93,8 +93,9 @@ public class SecurityConfig {
                 // Webhook от платежных провайдеров (публичный, но должен быть защищен на уровне провайдера)
                 .requestMatchers("/api/payments/webhook/**").permitAll()
                 // Если появятся новые пути в /api/user/, добавляйте их здесь явно
-                // Клиентские AI endpoints требуют X-API-Key (авторизацию настраивает ApiKeyAuthFilter)
+                // Клиентские endpoints требуют X-API-Key (авторизацию настраивает ApiKeyAuthFilter)
                 .requestMatchers("/api/ai/**").authenticated()
+                .requestMatchers("/api/social/**").authenticated()
                 // Все остальное запрещено
                 .anyRequest().denyAll()
             )

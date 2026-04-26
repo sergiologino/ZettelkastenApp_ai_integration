@@ -122,6 +122,7 @@ Content-Type: application/json
 | GET | `/api/ai/networks/{networkId}/available` | `X-API-Key` | Проверка доступа (в коде идентификатор — **логическое имя** сети, см. §6) |
 | GET | `/api/ai/networks/{networkId}/limits` | `X-API-Key` | Лимиты для сети |
 | GET | `/api/ai/health` | `X-API-Key` | Текстовый health (в `SecurityConfig` весь `/api/ai/**` требует аутентификации) |
+| POST | `/api/social/posts` | `X-API-Key` | Публикация текстового поста в Telegram, Facebook или X |
 
 **Проверка живости без ключа** (для балансировщиков):
 
@@ -292,13 +293,73 @@ curl -s -X POST "$BASE/api/ai/process" \
 
 ---
 
-## 12. Связь с пользовательским API (`/api/user/**`)
+## 12. Публикация постов в соцсети
+
+Endpoint:
+
+```http
+POST {BASE_URL}/api/social/posts
+X-API-Key: aikey_xxxxxxxx
+Content-Type: application/json
+```
+
+Общий формат:
+
+```json
+{
+  "userId": "external-user-1",
+  "platform": "telegram",
+  "text": "Текст поста",
+  "credentials": {
+    "botToken": "<telegram bot token>",
+    "chatId": "<telegram chat id>"
+  },
+  "options": {
+    "parseMode": "HTML"
+  }
+}
+```
+
+Поддерживаемые платформы:
+
+| platform | credentials | options |
+|----------|-------------|---------|
+| `telegram` | `botToken`, `chatId` | `parseMode`, `disableWebPagePreview` |
+| `facebook` | `accessToken`, `pageId` | `link` |
+| `x` | `bearerToken` | `replyToTweetId` |
+
+Секреты из `credentials` используются только для транзитного HTTP-вызова провайдера и **не сохраняются** в `request_logs`; в лог пишутся только имена переданных credential-полей. Результаты логируются с `request_type = social_post:<platform>`.
+
+Ответ:
+
+```json
+{
+  "requestId": "<uuid>",
+  "status": "success",
+  "platform": "telegram",
+  "providerPostId": "42",
+  "response": {},
+  "errorMessage": null,
+  "executionTimeMs": 123
+}
+```
+
+Админская статистика для фронта:
+
+```http
+GET {BASE_URL}/api/admin/social/stats
+Authorization: Bearer <JWT>
+```
+
+---
+
+## 13. Связь с пользовательским API (`/api/user/**`)
 
 Для сценариев «конечный пользователь заходит через Google/Yandex, оформляет подписку, хранит свои ключи провайдера» существует отдельная зона **`/api/user/**`** (см. контроллеры `UserAuthController`, `UserClientController`, `UserApiKeyController`). Для **сервер-сервер** интеграции одного бэкенда с AI Integration **достаточно** модели **клиент + `X-API-Key`** из разделов 3–8.
 
 ---
 
-## 13. Диаграмма потока (MVP)
+## 14. Диаграмма потока (MVP)
 
 ```mermaid
 sequenceDiagram
@@ -321,7 +382,7 @@ sequenceDiagram
 
 ---
 
-## 14. Где смотреть код при сомнениях
+## 15. Где смотреть код при сомнениях
 
 - Контракт REST: `controller/AiController.java`, `controller/AdminController.java`, `controller/NetworkAccessController.java`, `controller/AuthController.java`.
 - Безопасность: `security/SecurityConfig.java`, `security/ApiKeyAuthFilter.java`, `security/JwtAuthFilter.java`.

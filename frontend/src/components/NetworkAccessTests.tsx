@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { fetchApi } from '../api';
 
 interface TestResult {
   name: string;

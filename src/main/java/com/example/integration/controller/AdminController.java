@@ -5,6 +5,7 @@ import com.example.integration.model.RequestLog;
 import com.example.integration.repository.RequestLogRepository;
 import com.example.integration.service.ClientManagementService;
 import com.example.integration.service.NetworkManagementService;
+import com.example.integration.service.SocialPostService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +41,7 @@ public class AdminController {
     private final com.example.integration.repository.NeuralNetworkRepository neuralNetworkRepository;
     private final com.example.integration.repository.ClientApplicationRepository clientApplicationRepository;
     private final com.example.integration.repository.PaymentHistoryRepository paymentHistoryRepository;
+    private final SocialPostService socialPostService;
     
     public AdminController(
         NetworkManagementService networkService,
@@ -47,7 +49,8 @@ public class AdminController {
         RequestLogRepository requestLogRepository,
         com.example.integration.repository.NeuralNetworkRepository neuralNetworkRepository,
         com.example.integration.repository.ClientApplicationRepository clientApplicationRepository,
-        com.example.integration.repository.PaymentHistoryRepository paymentHistoryRepository
+        com.example.integration.repository.PaymentHistoryRepository paymentHistoryRepository,
+        SocialPostService socialPostService
     ) {
         this.networkService = networkService;
         this.clientService = clientService;
@@ -55,6 +58,7 @@ public class AdminController {
         this.neuralNetworkRepository = neuralNetworkRepository;
         this.clientApplicationRepository = clientApplicationRepository;
         this.paymentHistoryRepository = paymentHistoryRepository;
+        this.socialPostService = socialPostService;
     }
     
     // ==================== Neural Networks ====================
@@ -466,6 +470,12 @@ public class AdminController {
         );
         
         return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/social/stats")
+    @Operation(summary = "Get social posting statistics")
+    public ResponseEntity<SocialPostStatsDTO> getSocialPostStats() {
+        return ResponseEntity.ok(socialPostService.getStats());
     }
     
     /**

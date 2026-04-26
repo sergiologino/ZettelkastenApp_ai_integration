@@ -57,7 +57,7 @@ export const NetworkAccessManager: React.FC = () => {
     e.preventDefault();
     
     try {
-      const response = await fetchApi('/api/admin/access', {
+      await fetchApi('/api/admin/access', {
         method: 'POST',
         body: JSON.stringify(formData),
       });
@@ -90,8 +90,8 @@ export const NetworkAccessManager: React.FC = () => {
     setFormData({
       clientId: '',
       networkId: '',
-      dailyRequestLimit: null,
-      monthlyRequestLimit: null,
+      dailyRequestLimit: undefined,
+      monthlyRequestLimit: undefined,
     });
     setIsModalOpen(true);
   };
@@ -309,7 +309,7 @@ export const NetworkAccessManager: React.FC = () => {
                     value={formData.dailyRequestLimit || ''}
                     onChange={(e) => setFormData({ 
                       ...formData, 
-                      dailyRequestLimit: e.target.value ? parseInt(e.target.value) : null 
+                      dailyRequestLimit: e.target.value ? parseInt(e.target.value) : undefined 
                     })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
                     placeholder="Оставьте пустым для неограниченного доступа"
@@ -326,7 +326,7 @@ export const NetworkAccessManager: React.FC = () => {
                     value={formData.monthlyRequestLimit || ''}
                     onChange={(e) => setFormData({ 
                       ...formData, 
-                      monthlyRequestLimit: e.target.value ? parseInt(e.target.value) : null 
+                      monthlyRequestLimit: e.target.value ? parseInt(e.target.value) : undefined 
                     })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
                     placeholder="Оставьте пустым для неограниченного доступа"
