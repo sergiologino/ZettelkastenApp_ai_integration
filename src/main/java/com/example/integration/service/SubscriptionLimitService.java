@@ -46,23 +46,24 @@ public class SubscriptionLimitService {
         log.info("   Клиент: {} (ID: {})", clientApp.getName(), clientApp.getId());
         log.info("   Нейросеть: {} (ID: {}, name: {})", network.getDisplayName(), network.getId(), network.getName());
         
-        // 1. Получить владельца клиентского приложения
+        // 1–2. Владелец клиента (опционально) и подписка
         Optional<UserClientLink> linkOpt = userClientLinkRepository.findByClientApplication(clientApp.getId());
-        if (linkOpt.isEmpty()) {
-            log.warn("⚠️ [SubscriptionLimitService] Клиент {} не привязан к пользователю", clientApp.getName());
-            return "Клиентское приложение не привязано к пользователю";
+        UserAccount user = null;
+        if (linkOpt.isPresent()) {
+            user = linkOpt.get().getUser();
+            log.info("   Пользователь: {} (ID: {})", user.getEmail(), user.getId());
+        } else {
+            log.warn(
+                    "⚠️ [SubscriptionLimitService] Клиент {} не привязан к пользователю — лимиты только по client_network_access (как бесплатный план)",
+                    clientApp.getName());
         }
 
-        UserAccount user = linkOpt.get().getUser();
-        log.info("   Пользователь: {} (ID: {})", user.getEmail(), user.getId());
-
-        // 2. Получить текущую подписку
-        Optional<Subscription> subscriptionOpt = subscriptionService.getCurrentSubscription(user);
+        Optional<Subscription> subscriptionOpt =
+                user != null ? subscriptionService.getCurrentSubscription(user) : Optional.empty();
         SubscriptionPlan plan;
         boolean isFreePlan;
 
         if (subscriptionOpt.isEmpty() || !subscriptionOpt.get().isActive()) {
-            // Нет активной подписки - используем бесплатный план
             plan = subscriptionService.getFreePlan();
             isFreePlan = true;
             log.info("   План: бесплатный (нет активной подписки)");

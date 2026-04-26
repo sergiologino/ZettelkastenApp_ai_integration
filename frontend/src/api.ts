@@ -8,6 +8,7 @@ import type {
   ClientApplication,
   ClientCreateRequest,
   RequestLog,
+  SocialPostStats,
   UsageStats,
 } from './types';
 
@@ -32,10 +33,15 @@ export async function fetchApi<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getToken();
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
   };
+
+  if (options.headers) {
+    new Headers(options.headers).forEach((value, key) => {
+      headers[key] = value;
+    });
+  }
 
   if (token && !endpoint.includes('/auth/')) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -184,5 +190,9 @@ export const getLogs = async (
 
 export const getStats = async (): Promise<UsageStats> => {
   return fetchApi<UsageStats>('/api/admin/stats');
+};
+
+export const getSocialPostStats = async (): Promise<SocialPostStats> => {
+  return fetchApi<SocialPostStats>('/api/admin/social/stats');
 };
 

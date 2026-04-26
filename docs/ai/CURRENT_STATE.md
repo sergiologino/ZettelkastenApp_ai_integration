@@ -25,11 +25,13 @@
 - БД: Flyway; сущности `UserAccount`, `NeuralNetwork`, `ClientNetworkAccess`, `UserApiKey`, подписки, платежи и др.
 - Админ- и AI-API в OpenAPI; Swagger UI: `/swagger-ui/**`, спецификация: `/v3/api-docs`. Actuator: `/actuator/health`, `/actuator/prometheus`.
 - **Dockerfile**: runtime-образ `eclipse-temurin:17-jdk-jammy` (заменён устаревший `openjdk:17-jdk-slim`).
+- **Social posting API**: клиентский endpoint `POST /api/social/posts` под `X-API-Key` публикует текстовые посты в Telegram, Facebook и X. Ключи платформ передаются в теле запроса и не сохраняются; результаты логируются в `request_logs` с `request_type = social_post:<platform>`. Админская статистика: `GET /api/admin/social/stats`; во фронте добавлен только блок статистики, без настроек ключей.
 
 ## План и бэклог (из README и кода)
 
 - Веб-админка (React-фронт в репозитории `frontend/`), streaming-ответы, кэш, расширенный мониторинг.
 - Доработки лимитов/метрик в ответах (часть полей помечена TODO в коде).
+- Настройки social-платформ в админке/кабинете пока не реализованы: по текущему контракту секреты передаёт клиент в каждом запросе.
 
 ## Не в фокусе
 

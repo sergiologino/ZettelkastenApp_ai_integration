@@ -3,9 +3,11 @@ package com.example.integration.service;
 import com.example.integration.dto.AssignClientUserRequest;
 import com.example.integration.dto.ClientAppCreateRequest;
 import com.example.integration.dto.ClientAppDTO;
+import com.example.integration.model.AdminUser;
 import com.example.integration.model.ClientApplication;
 import com.example.integration.model.UserAccount;
 import com.example.integration.model.UserClientLink;
+import com.example.integration.repository.AdminUserRepository;
 import com.example.integration.repository.ClientApplicationRepository;
 import com.example.integration.repository.UserAccountRepository;
 import com.example.integration.repository.UserClientLinkRepository;
@@ -33,15 +35,18 @@ public class ClientManagementService {
     private final ClientApplicationRepository clientAppRepository;
     private final UserAccountRepository userAccountRepository;
     private final UserClientLinkRepository userClientLinkRepository;
-    
+    private final AdminUserRepository adminUserRepository;
+
     public ClientManagementService(
         ClientApplicationRepository clientAppRepository,
         UserAccountRepository userAccountRepository,
-        UserClientLinkRepository userClientLinkRepository
+        UserClientLinkRepository userClientLinkRepository,
+        AdminUserRepository adminUserRepository
     ) {
         this.clientAppRepository = clientAppRepository;
         this.userAccountRepository = userAccountRepository;
         this.userClientLinkRepository = userClientLinkRepository;
+        this.adminUserRepository = adminUserRepository;
     }
     
     /**
@@ -66,9 +71,85 @@ public class ClientManagementService {
         client.setIsActive(true);
         
         client = clientAppRepository.save(client);
+        linkClientToPrimaryOwnerIfMissing(client);
         return toDTO(client);
     }
-    
+
+    /**
+     * При старте: для клиентов без привязки создаётся связь с владельцем из {@code admin_users} (как при деплое с одним admin/admin).
+     */
+    @Transactional
+    public void backfillMissingClientOwnerLinks() {
+        Optional<UserAccount> ownerOpt = getOrCreateUserAccountForPrimaryAdmin();
+        if (ownerOpt.isEmpty()) {
+            return;
+        }
+        UserAccount owner = ownerOpt.get();
+        int linked = 0;
+        for (ClientApplication c : clientAppRepository.findByDeletedFalse()) {
+            if (userClientLinkRepository.findByClientApplication(c.getId()).isEmpty()) {
+                UserClientLink link = new UserClientLink();
+                link.setClientApplication(c);
+                link.setUser(owner);
+                userClientLinkRepository.save(link);
+                linked++;
+                log.info(
+                        "🔧 [ClientManagement] Backfill: клиент «{}» привязан к user_accounts {} (владелец admin)",
+                        c.getName(),
+                        owner.getEmail());
+            }
+        }
+        if (linked > 0) {
+            log.info("🔧 [ClientManagement] Backfill user_client_links: добавлено привязок: {}", linked);
+        }
+    }
+
+    /**
+     * Запись в {@code user_accounts} для того же email, что у основного админа из {@code admin_users}, если её ещё нет
+     * (нужно для лимитов/подписки по API-ключу без ручного POST /assign-user).
+     */
+    private Optional<UserAccount> getOrCreateUserAccountForPrimaryAdmin() {
+        Optional<AdminUser> primary = adminUserRepository.findByUsername("admin");
+        AdminUser admin = primary.orElseGet(() -> adminUserRepository.findAll().stream().findFirst().orElse(null));
+        if (admin == null) {
+            log.warn("🔧 [ClientManagement] Таблица admin_users пуста — автопривязка клиентов пропущена");
+            return Optional.empty();
+        }
+        Optional<UserAccount> existing = userAccountRepository.findByEmail(admin.getEmail());
+        if (existing.isPresent()) {
+            return existing;
+        }
+        UserAccount u = new UserAccount();
+        u.setEmail(admin.getEmail());
+        u.setFullName(admin.getUsername());
+        u.setActive(true);
+        u.setProvider("admin-bootstrap");
+        UserAccount saved = userAccountRepository.save(u);
+        log.info(
+                "🔧 [ClientManagement] Создан user_accounts для email админа {} (как в UserClientController)",
+                saved.getEmail());
+        return Optional.of(saved);
+    }
+
+    private void linkClientToPrimaryOwnerIfMissing(ClientApplication client) {
+        if (userClientLinkRepository.findByClientApplication(client.getId()).isPresent()) {
+            return;
+        }
+        UserAccount owner =
+                getOrCreateUserAccountForPrimaryAdmin().orElse(null);
+        if (owner == null) {
+            return;
+        }
+        UserClientLink link = new UserClientLink();
+        link.setClientApplication(client);
+        link.setUser(owner);
+        userClientLinkRepository.save(link);
+        log.info(
+                "🔧 [ClientManagement] Клиент «{}» автоматически привязан к {} (owner из admin_users)",
+                client.getName(),
+                owner.getEmail());
+    }
+
     /**
      * Обновить клиентское приложение
      */

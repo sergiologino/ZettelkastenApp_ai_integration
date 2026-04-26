@@ -96,6 +96,15 @@ export interface UsageStats {
   requestsByClient: Record<string, number>;
 }
 
+export interface SocialPostStats {
+  totalPosts: number;
+  successfulPosts: number;
+  failedPosts: number;
+  postsByPlatform: Record<string, number>;
+  successfulPostsByPlatform: Record<string, number>;
+  failedPostsByPlatform: Record<string, number>;
+}
+
 export interface ClientNetworkAccess {
   id: string;
   clientId: string;
