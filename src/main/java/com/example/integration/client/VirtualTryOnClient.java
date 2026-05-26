@@ -65,6 +65,9 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         String garmentBrand = extractString(payload, "garmentBrand");
         String selectedSize = extractString(payload, "selectedSize");
 
+        String fitPromptHint = extractString(payload, "fitPromptHint");
+        String figureLockPrompt = extractString(payload, "figureLockPrompt");
+        String clothingSize = extractString(payload, "clothingSize");
         String enrichedPrompt = buildTryOnPrompt(
             basePrompt,
             garmentBrand,
@@ -75,7 +78,9 @@ public class VirtualTryOnClient extends BaseNeuralClient {
             extractInteger(payload, "heightCm"),
             extractInteger(payload, "bustCm"),
             extractInteger(payload, "waistCm"),
-            extractInteger(payload, "hipsCm")
+            extractInteger(payload, "hipsCm"),
+            clothingSize,
+            fitPromptHint
         );
 
         String skipGrokReason = grokSkipReason(network, personImage, garmentImage);
@@ -96,7 +101,10 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                 extractInteger(payload, "heightCm"),
                 extractInteger(payload, "bustCm"),
                 extractInteger(payload, "waistCm"),
-                extractInteger(payload, "hipsCm")
+                extractInteger(payload, "hipsCm"),
+                clothingSize,
+                figureLockPrompt,
+                fitPromptHint
             );
             log.info("Virtual try-on via Grok Imagine edit, keySource={}, promptLen={}", keySource, editPrompt.length());
             try {
@@ -198,16 +206,24 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         Integer heightCm,
         Integer bustCm,
         Integer waistCm,
-        Integer hipsCm
+        Integer hipsCm,
+        String clothingSize,
+        String fitPromptHint
     ) {
         StringBuilder builder = new StringBuilder();
         builder.append(
             "Virtual try-on: dress the person in image1 with the exact clothing from image2. "
         );
-        builder.append("image1 is the customer body reference. image2 is the product photo from the marketplace card. ");
+        builder.append("image1 is the customer body reference — the figure in image1 is authoritative. ");
+        builder.append("image2 is the product photo from the marketplace card. ");
         builder.append("Replace current clothes on the person with ONLY the garment from image2. ");
         builder.append("Do not leave underwear, bra, panties or the old outfit visible. ");
-        builder.append("Preserve the same person identity, face, hair, skin tone and body proportions from image1. ");
+        builder.append(
+            "Preserve the same person identity, face, hair, skin tone from image1. "
+                + "BODY FIGURE PRIORITY: keep full bust volume, hip width and waist curve from image1 — "
+                + "never slim breasts, hips or thighs to fit the garment. "
+                + "Do not turn a curvy EU 50–52 body into a EU 44–46 silhouette. "
+        );
         if (garmentBrand != null && !garmentBrand.isBlank()) {
             builder.append("Brand: ").append(garmentBrand).append(". ");
         }
@@ -215,10 +231,19 @@ public class VirtualTryOnClient extends BaseNeuralClient {
             builder.append("Product: ").append(garmentTitle).append(". ");
         }
         if (selectedSize != null && !selectedSize.isBlank()) {
-            builder.append("Size: ").append(selectedSize).append(". ");
+            builder.append("Marketplace label size on card: ").append(selectedSize).append(". ");
+        }
+        if (clothingSize != null && !clothingSize.isBlank()) {
+            builder.append("Customer usual clothing size: ").append(clothingSize).append(". ");
         }
         appendAnthropometry(builder, heightCm, bustCm, waistCm, hipsCm);
+        if (fitPromptHint != null && !fitPromptHint.isBlank()) {
+            builder.append(' ').append(fitPromptHint).append(' ');
+        }
         builder.append("Photorealistic full-body fashion photo, neutral studio background, natural standing pose, vertical 3:4.");
+        if (figureLockPrompt != null && !figureLockPrompt.isBlank()) {
+            builder.append(' ').append(figureLockPrompt);
+        }
         return builder.toString().replaceAll("\\s+", " ").trim();
     }
 
@@ -248,7 +273,9 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         Integer heightCm,
         Integer bustCm,
         Integer waistCm,
-        Integer hipsCm
+        Integer hipsCm,
+        String clothingSize,
+        String fitPromptHint
     ) {
         StringBuilder builder = new StringBuilder(basePrompt.trim());
         builder.append(" Photorealistic virtual try-on result.");
@@ -259,14 +286,22 @@ public class VirtualTryOnClient extends BaseNeuralClient {
             builder.append(" Garment: ").append(garmentTitle).append('.');
         }
         if (selectedSize != null && !selectedSize.isBlank()) {
-            builder.append(" Size fit: ").append(selectedSize).append('.');
+            builder.append(" Marketplace label size: ").append(selectedSize).append('.');
+        }
+        if (clothingSize != null && !clothingSize.isBlank()) {
+            builder.append(" Customer usual size: ").append(clothingSize).append('.');
         }
         appendAnthropometry(builder, heightCm, bustCm, waistCm, hipsCm);
+        if (fitPromptHint != null && !fitPromptHint.isBlank()) {
+            builder.append(' ').append(fitPromptHint);
+        }
         if (personImage != null && !personImage.isBlank()) {
             builder.append(
                 " Keep the exact same person from the reference photo — same face, hair, skin tone, pose and body silhouette."
             );
-            builder.append(" Do not slim, widen or reshape the body.");
+            builder.append(
+                " Preserve full bust and hip volume from the reference — do not slim the body to fit the garment."
+            );
         }
         if (garmentImage != null && !garmentImage.isBlank()) {
             builder.append(" Dress the person in the exact garment from the reference clothing photo — match color, cut, fabric and details.");
@@ -298,7 +333,9 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         if (hipsCm != null) {
             builder.append(", hips ").append(hipsCm).append(" cm");
         }
-        builder.append(". Output must match these proportions exactly — not a generic fashion model body.");
+        builder.append(
+            ". Output must match these proportions exactly — full bust and hips, not a generic slim fashion model."
+        );
     }
 
     private static Integer extractInteger(Map<String, Object> payload, String key) {
