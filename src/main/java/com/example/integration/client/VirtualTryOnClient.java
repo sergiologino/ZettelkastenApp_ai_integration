@@ -97,6 +97,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                 "virtual_try_on_grok keySource=" + keySource
             );
             String editPrompt = buildGrokEditPrompt(
+                basePrompt,
                 garmentBrand,
                 garmentTitle,
                 garmentCategory,
@@ -125,6 +126,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                     log.warn("Grok content moderation (keySource={}), retrying with retail-safe prompt", keySource);
                     try {
                         String safePrompt = buildGrokEditPrompt(
+                            basePrompt,
                             garmentBrand,
                             garmentTitle,
                             garmentCategory,
@@ -247,6 +249,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
     }
 
     private static String buildGrokEditPrompt(
+        String clientPrompt,
         String garmentBrand,
         String garmentTitle,
         String garmentCategory,
@@ -261,8 +264,12 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         boolean strictRetailSafe
     ) {
         StringBuilder builder = new StringBuilder();
-        builder.append(FashionRetailSafetyPrompt.moderationContext(garmentTitle, garmentCategory, strictRetailSafe));
+        builder.append(FashionRetailSafetyPrompt.moderationContextRu(garmentTitle, garmentCategory, strictRetailSafe));
         builder.append(' ');
+        if (clientPrompt != null && !clientPrompt.isBlank()) {
+            builder.append(clientPrompt.trim());
+            return builder.toString().replaceAll("\\s+", " ").trim();
+        }
         if (figureLockPrompt != null && !figureLockPrompt.isBlank()) {
             builder.append(figureLockPrompt).append(' ');
         }
@@ -334,7 +341,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         String fitPromptHint
     ) {
         StringBuilder builder = new StringBuilder();
-        builder.append(FashionRetailSafetyPrompt.moderationContext(garmentTitle, garmentCategory, false));
+        builder.append(FashionRetailSafetyPrompt.moderationContextRu(garmentTitle, garmentCategory, false));
         builder.append(' ');
         builder.append(basePrompt.trim());
         builder.append(" Photorealistic virtual try-on result.");
