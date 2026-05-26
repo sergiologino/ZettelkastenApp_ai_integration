@@ -63,6 +63,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         );
         String garmentTitle = extractString(payload, "garmentTitle");
         String garmentBrand = extractString(payload, "garmentBrand");
+        String garmentCategory = extractString(payload, "garmentCategory");
         String selectedSize = extractString(payload, "selectedSize");
 
         String fitPromptHint = extractString(payload, "fitPromptHint");
@@ -72,6 +73,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
             basePrompt,
             garmentBrand,
             garmentTitle,
+            garmentCategory,
             selectedSize,
             personImage,
             garmentImage,
@@ -97,6 +99,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
             String editPrompt = buildGrokEditPrompt(
                 garmentBrand,
                 garmentTitle,
+                garmentCategory,
                 selectedSize,
                 extractInteger(payload, "heightCm"),
                 extractInteger(payload, "bustCm"),
@@ -104,12 +107,13 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                 extractInteger(payload, "hipsCm"),
                 clothingSize,
                 figureLockPrompt,
-                fitPromptHint
+                fitPromptHint,
+                false
             );
             log.info("Virtual try-on via Grok Imagine edit, keySource={}, promptLen={}", keySource, editPrompt.length());
             try {
                 xaiApiKeyResolver.resolve(network).ifPresent(BaseNeuralClient::setUserApiKey);
-                Map<String, Object> generated = xaiImagineEditClient.editVirtualTryOn(network, payload, editPrompt);
+                Map<String, Object> generated = tryGrokEdit(network, payload, editPrompt);
                 Map<String, Object> result = new HashMap<>(generated);
                 result.put("provider", "virtual_try_on_grok");
                 result.put("tryOnRoute", "grok_imagine");
@@ -117,6 +121,41 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                 result.put("prompt", editPrompt);
                 return result;
             } catch (Exception ex) {
+                if (FashionRetailSafetyPrompt.isContentModerationFailure(ex)) {
+                    log.warn("Grok content moderation (keySource={}), retrying with retail-safe prompt", keySource);
+                    try {
+                        String safePrompt = buildGrokEditPrompt(
+                            garmentBrand,
+                            garmentTitle,
+                            garmentCategory,
+                            selectedSize,
+                            extractInteger(payload, "heightCm"),
+                            extractInteger(payload, "bustCm"),
+                            extractInteger(payload, "waistCm"),
+                            extractInteger(payload, "hipsCm"),
+                            clothingSize,
+                            figureLockPrompt,
+                            fitPromptHint,
+                            true
+                        );
+                        Map<String, Object> generated = tryGrokEdit(network, payload, safePrompt);
+                        Map<String, Object> result = new HashMap<>(generated);
+                        result.put("provider", "virtual_try_on_grok");
+                        result.put("tryOnRoute", "grok_imagine");
+                        result.put("tryOnRouteReason", "grok_imagine_retail_safe_retry");
+                        result.put("xaiKeySource", keySource);
+                        result.put("prompt", safePrompt);
+                        return result;
+                    } catch (Exception retryEx) {
+                        log.warn("Grok retail-safe retry also failed: {}", retryEx.getMessage());
+                        throw new IllegalStateException(
+                            "VTON_CONTENT_MODERATION: xAI rejected catalog try-on. "
+                                + "This is retail sleepwear/homewear fitting, not adult content. "
+                                + retryEx.getMessage(),
+                            retryEx
+                        );
+                    }
+                }
                 log.warn("Grok Imagine try-on failed (keySource={}), falling back to Pollinations: {}", keySource, ex.getMessage(), ex);
                 skipGrokReason = "grok_api_error: " + ex.getMessage();
             } finally {
@@ -139,6 +178,10 @@ public class VirtualTryOnClient extends BaseNeuralClient {
             xaiKeyPresent,
             "virtual_try_on_pollinations reason=" + (skipGrokReason != null ? skipGrokReason : "unknown")
         );
+        if (skipGrokReason != null && skipGrokReason.contains("VTON_CONTENT_MODERATION")) {
+            throw new IllegalStateException(skipGrokReason);
+        }
+
         log.info("Virtual try-on via Pollinations text-only, promptLen={}", enrichedPrompt.length());
 
         Map<String, Object> generationPayload = new HashMap<>();
@@ -199,9 +242,14 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         return apiUrl != null && apiUrl.toLowerCase().contains("x.ai");
     }
 
+    private Map<String, Object> tryGrokEdit(NeuralNetwork network, Map<String, Object> payload, String editPrompt) throws Exception {
+        return xaiImagineEditClient.editVirtualTryOn(network, payload, editPrompt);
+    }
+
     private static String buildGrokEditPrompt(
         String garmentBrand,
         String garmentTitle,
+        String garmentCategory,
         String selectedSize,
         Integer heightCm,
         Integer bustCm,
@@ -209,9 +257,12 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         Integer hipsCm,
         String clothingSize,
         String figureLockPrompt,
-        String fitPromptHint
+        String fitPromptHint,
+        boolean strictRetailSafe
     ) {
         StringBuilder builder = new StringBuilder();
+        builder.append(FashionRetailSafetyPrompt.moderationContext(garmentTitle, garmentCategory, strictRetailSafe));
+        builder.append(' ');
         if (figureLockPrompt != null && !figureLockPrompt.isBlank()) {
             builder.append(figureLockPrompt).append(' ');
         }
@@ -220,8 +271,8 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         );
         builder.append("image1 is the customer body reference — the figure in image1 is authoritative. ");
         builder.append("image2 is the product photo from the marketplace card. ");
-        builder.append("Replace current clothes on the person with ONLY the garment from image2. ");
-        builder.append("Do not leave underwear, bra, panties or the old outfit visible. ");
+        builder.append("Overlay the marketplace garment from image2 on the person; person must be fully dressed in that product. ");
+        builder.append("Remove previous outfit from view — person wears only the retail product, appropriately covered. ");
         builder.append(
             "Preserve the same person identity, face, hair, skin tone from image1. "
                 + "BODY FIGURE PRIORITY: keep full bust volume, hip width and waist curve from image1 — "
@@ -271,6 +322,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         String basePrompt,
         String garmentBrand,
         String garmentTitle,
+        String garmentCategory,
         String selectedSize,
         String personImage,
         String garmentImage,
@@ -281,7 +333,10 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         String clothingSize,
         String fitPromptHint
     ) {
-        StringBuilder builder = new StringBuilder(basePrompt.trim());
+        StringBuilder builder = new StringBuilder();
+        builder.append(FashionRetailSafetyPrompt.moderationContext(garmentTitle, garmentCategory, false));
+        builder.append(' ');
+        builder.append(basePrompt.trim());
         builder.append(" Photorealistic virtual try-on result.");
         if (garmentBrand != null && !garmentBrand.isBlank()) {
             builder.append(" Brand: ").append(garmentBrand).append('.');
