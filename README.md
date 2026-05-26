@@ -258,12 +258,31 @@ src/
 
 ## 📝 Логи
 
-Логи запросов хранятся в таблице `request_logs` и доступны через API:
+### Консоль (`[AI-TRAFFIC]`)
+
+Каждый `POST /api/ai/process` пишет в лог **тело запроса и ответа** (base64 заменён на `[base64 omitted, chars=N]`):
+
+```
+[AI-TRAFFIC] IN requestId=... client=... network=wibestyle-vton type=image_generation payload={...}
+[AI-TRAFFIC] VTON route network=wibestyle-vton ... provider=virtual_try_on_grok
+[AI-TRAFFIC] OUT requestId=... status=success response={...}
+```
+
+Уровень: `LOG_LEVEL_AI_TRAFFIC=INFO` (logger `AI_TRAFFIC`).
+
+### БД и админка
+
+Логи запросов хранятся в `request_logs` (тоже без base64) и доступны:
+
+- UI: раздел **Логи запросов** (React admin)
+- API:
 
 ```bash
 curl -X GET "http://localhost:8091/api/admin/logs?page=0&size=50" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
+
+Детали одного запроса: `GET /api/admin/logs/{id}`.
 
 ## 🔒 Безопасность
 

@@ -2,6 +2,8 @@ package com.example.integration.client;
 
 import com.example.integration.model.NeuralNetwork;
 import com.example.integration.security.EncryptionService;
+import com.example.integration.support.AiTrafficLogger;
+import com.example.integration.support.XaiApiKeyResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,17 +25,20 @@ public class VirtualTryOnClient extends BaseNeuralClient {
 
     private final PollinationsClient pollinationsClient;
     private final XaiImagineEditClient xaiImagineEditClient;
+    private final XaiApiKeyResolver xaiApiKeyResolver;
 
     public VirtualTryOnClient(
         RestTemplate restTemplate,
         ObjectMapper objectMapper,
         EncryptionService encryptionService,
         PollinationsClient pollinationsClient,
-        XaiImagineEditClient xaiImagineEditClient
+        XaiImagineEditClient xaiImagineEditClient,
+        XaiApiKeyResolver xaiApiKeyResolver
     ) {
         super(restTemplate, objectMapper, encryptionService);
         this.pollinationsClient = pollinationsClient;
         this.xaiImagineEditClient = xaiImagineEditClient;
+        this.xaiApiKeyResolver = xaiApiKeyResolver;
     }
 
     @Override
@@ -45,6 +50,17 @@ public class VirtualTryOnClient extends BaseNeuralClient {
 
         String personImage = extractString(payload, "personImageBase64");
         String garmentImage = extractString(payload, "garmentImageBase64");
+        boolean xaiKeyPresent = hasConfiguredApiKey(network);
+        String keySource = xaiApiKeyResolver.describeKeySource(network);
+        AiTrafficLogger.logTryOnRoute(
+            network.getName(),
+            personImage != null,
+            garmentImage != null,
+            isGrokBackend(network),
+            apiUrlPointsToXai(network),
+            xaiKeyPresent,
+            "evaluating keySource=" + keySource
+        );
         String garmentTitle = extractString(payload, "garmentTitle");
         String garmentBrand = extractString(payload, "garmentBrand");
         String selectedSize = extractString(payload, "selectedSize");
@@ -62,7 +78,17 @@ public class VirtualTryOnClient extends BaseNeuralClient {
             extractInteger(payload, "hipsCm")
         );
 
-        if (shouldUseGrokEdit(network, personImage, garmentImage)) {
+        String skipGrokReason = grokSkipReason(network, personImage, garmentImage);
+        if (skipGrokReason == null) {
+            AiTrafficLogger.logTryOnRoute(
+                network.getName(),
+                true,
+                true,
+                isGrokBackend(network),
+                apiUrlPointsToXai(network),
+                true,
+                "virtual_try_on_grok keySource=" + keySource
+            );
             String editPrompt = buildGrokEditPrompt(
                 garmentBrand,
                 garmentTitle,
@@ -72,24 +98,39 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                 extractInteger(payload, "waistCm"),
                 extractInteger(payload, "hipsCm")
             );
-            log.info("Virtual try-on via Grok Imagine edit, promptLen={}", editPrompt.length());
+            log.info("Virtual try-on via Grok Imagine edit, keySource={}, promptLen={}", keySource, editPrompt.length());
             try {
+                xaiApiKeyResolver.resolve(network).ifPresent(BaseNeuralClient::setUserApiKey);
                 Map<String, Object> generated = xaiImagineEditClient.editVirtualTryOn(network, payload, editPrompt);
                 Map<String, Object> result = new HashMap<>(generated);
                 result.put("provider", "virtual_try_on_grok");
+                result.put("tryOnRoute", "grok_imagine");
+                result.put("xaiKeySource", keySource);
                 result.put("prompt", editPrompt);
                 return result;
             } catch (Exception ex) {
-                log.warn("Grok Imagine try-on failed, falling back to Pollinations text-only: {}", ex.getMessage());
+                log.warn("Grok Imagine try-on failed (keySource={}), falling back to Pollinations: {}", keySource, ex.getMessage(), ex);
+                skipGrokReason = "grok_api_error: " + ex.getMessage();
+            } finally {
+                BaseNeuralClient.clearUserApiKey();
             }
         } else if (personImage != null && garmentImage != null) {
             log.warn(
-                "Reference photos present but Grok Imagine is not configured (set xAI API key on network {}). "
-                    + "Using Pollinations text-only — garment fit will be unreliable.",
-                network.getName()
+                "Grok skipped for network {}: {}. Using Pollinations text-only.",
+                network.getName(),
+                skipGrokReason
             );
         }
 
+        AiTrafficLogger.logTryOnRoute(
+            network.getName(),
+            personImage != null,
+            garmentImage != null,
+            isGrokBackend(network),
+            apiUrlPointsToXai(network),
+            xaiKeyPresent,
+            "virtual_try_on_pollinations reason=" + (skipGrokReason != null ? skipGrokReason : "unknown")
+        );
         log.info("Virtual try-on via Pollinations text-only, promptLen={}", enrichedPrompt.length());
 
         Map<String, Object> generationPayload = new HashMap<>();
@@ -110,19 +151,30 @@ public class VirtualTryOnClient extends BaseNeuralClient {
 
         Map<String, Object> result = new HashMap<>(generated);
         result.put("provider", "virtual_try_on_pollinations");
+        result.put("tryOnRoute", "pollinations_text");
+        result.put("tryOnRouteReason", skipGrokReason != null ? skipGrokReason : "pollinations_fallback");
+        result.put("xaiKeySource", keySource);
         result.put("prompt", enrichedPrompt);
         result.put("data", extractOutputAsData(generated));
         return result;
     }
 
-    private boolean shouldUseGrokEdit(NeuralNetwork network, String personImage, String garmentImage) {
+    /** null = Grok should run; otherwise human-readable skip reason. */
+    private String grokSkipReason(NeuralNetwork network, String personImage, String garmentImage) {
         if (personImage == null || garmentImage == null) {
-            return false;
+            return "missing_person_or_garment_image";
         }
         if (!isGrokBackend(network) && !apiUrlPointsToXai(network)) {
-            return false;
+            return "network_not_configured_for_grok (apply Flyway V020, api_url must contain x.ai)";
         }
-        return hasConfiguredApiKey(network);
+        if (!hasConfiguredApiKey(network)) {
+            return "no_xai_api_key (set API Key on network wibestyle-vton in admin OR env XAI_API_KEY)";
+        }
+        return null;
+    }
+
+    private boolean hasConfiguredApiKey(NeuralNetwork network) {
+        return xaiApiKeyResolver.resolve(network).isPresent();
     }
 
     private boolean isGrokBackend(NeuralNetwork network) {
@@ -137,16 +189,6 @@ public class VirtualTryOnClient extends BaseNeuralClient {
     private static boolean apiUrlPointsToXai(NeuralNetwork network) {
         String apiUrl = network.getApiUrl();
         return apiUrl != null && apiUrl.toLowerCase().contains("x.ai");
-    }
-
-    private boolean hasConfiguredApiKey(NeuralNetwork network) {
-        if (network.getApiKeyEncrypted() != null && !network.getApiKeyEncrypted().isBlank()) {
-            String decrypted = encryptionService.decrypt(network.getApiKeyEncrypted());
-            if (decrypted != null && !decrypted.isBlank()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static String buildGrokEditPrompt(

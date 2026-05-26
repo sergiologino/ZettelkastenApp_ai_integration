@@ -8,6 +8,8 @@ import com.example.integration.dto.AvailableNetworkDTO;
 import com.example.integration.tts.TtsEnrichmentService;
 import com.example.integration.model.*;
 import com.example.integration.repository.*;
+import com.example.integration.support.AiPayloadLogSupport;
+import com.example.integration.support.AiTrafficLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -109,6 +111,15 @@ public class AiOrchestrationService {
         
         // 3. Создать лог запроса
         RequestLog requestLog = createRequestLog(clientApp, user, network, request);
+        String requestLogId = requestLog.getId().toString();
+        AiTrafficLogger.logIncoming(
+            requestLogId,
+            clientApp.getName(),
+            request.getUserId(),
+            network.getName(),
+            request.getRequestType(),
+            request.getPayload()
+        );
         
         try {
             // 3.5. Получить пользовательский API ключ (если есть)
@@ -144,8 +155,17 @@ public class AiOrchestrationService {
                 
                 // 7. Обновить лог
                 int executionTime = (int) (System.currentTimeMillis() - startTime);
-                requestLog.markCompleted("success", response, executionTime, tokensUsed);
+                Map<String, Object> sanitizedResponse = AiPayloadLogSupport.sanitize(response);
+                requestLog.markCompleted("success", sanitizedResponse, executionTime, tokensUsed);
                 requestLogRepository.save(requestLog);
+                AiTrafficLogger.logOutgoing(
+                    requestLogId,
+                    "success",
+                    network.getName(),
+                    executionTime,
+                    null,
+                    sanitizedResponse
+                );
                 
                 // 8. Сформировать ответ
                 return buildResponse(requestLog.getId().toString(), network, response, tokensUsed, executionTime, user);
@@ -179,6 +199,14 @@ public class AiOrchestrationService {
             int executionTime = (int) (System.currentTimeMillis() - startTime);
             requestLog.markFailed(e.getMessage(), executionTime);
             requestLogRepository.save(requestLog);
+            AiTrafficLogger.logOutgoing(
+                requestLogId,
+                "failed",
+                network.getName(),
+                executionTime,
+                e.getMessage(),
+                Map.of()
+            );
             
             AiResponseDTO errorResponse = new AiResponseDTO();
             errorResponse.setRequestId(requestLog.getId().toString());
@@ -269,7 +297,7 @@ public class AiOrchestrationService {
         log.setExternalUser(user);
         log.setNeuralNetwork(network);
         log.setRequestType(request.getRequestType());
-        log.setRequestPayload(request.getPayload());
+        log.setRequestPayload(AiPayloadLogSupport.sanitize(request.getPayload()));
         log.setStatus("pending");
         return requestLogRepository.save(log);
     }

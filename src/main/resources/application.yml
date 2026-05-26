@@ -59,6 +59,10 @@ jwt:
 encryption:
   secret-key: ${ENCRYPTION_SECRET_KEY:change-this-to-32-byte-secret-key-in-production!!!!!}
   
+# xAI (Grok Imagine try-on) — fallback if wibestyle-vton network has no API Key in admin UI
+xai:
+  api-key: ${XAI_API_KEY:}
+
 # AI Service Configuration
 ai:
   request-timeout: ${AI_REQUEST_TIMEOUT:60}
@@ -75,6 +79,7 @@ ai:
 logging:
   level:
     com.example.integration: ${LOG_LEVEL:INFO}
+    AI_TRAFFIC: ${LOG_LEVEL_AI_TRAFFIC:INFO}
     org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
     org.flywaydb: INFO
   pattern:
