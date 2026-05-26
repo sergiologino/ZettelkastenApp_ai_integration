@@ -208,9 +208,13 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         Integer waistCm,
         Integer hipsCm,
         String clothingSize,
+        String figureLockPrompt,
         String fitPromptHint
     ) {
         StringBuilder builder = new StringBuilder();
+        if (figureLockPrompt != null && !figureLockPrompt.isBlank()) {
+            builder.append(figureLockPrompt).append(' ');
+        }
         builder.append(
             "Virtual try-on: dress the person in image1 with the exact clothing from image2. "
         );

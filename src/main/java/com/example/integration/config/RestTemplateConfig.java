@@ -18,8 +18,8 @@ public class RestTemplateConfig {
     @Primary
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
         return builder
-            .setConnectTimeout(Duration.ofSeconds(60))
-            .setReadTimeout(Duration.ofSeconds(120))
+            .connectTimeout(Duration.ofSeconds(60))
+            .readTimeout(Duration.ofSeconds(120))
             .build();
     }
 
@@ -27,8 +27,8 @@ public class RestTemplateConfig {
     @Qualifier("ttsRestTemplate")
     public RestTemplate ttsRestTemplate(RestTemplateBuilder builder, TtsProperties ttsProperties) {
         return builder
-            .setConnectTimeout(Duration.ofMillis(ttsProperties.getConnectTimeoutMs()))
-            .setReadTimeout(Duration.ofMillis(ttsProperties.getReadTimeoutMs()))
+            .connectTimeout(Duration.ofMillis(ttsProperties.getConnectTimeoutMs()))
+            .readTimeout(Duration.ofMillis(ttsProperties.getReadTimeoutMs()))
             .build();
     }
 }
