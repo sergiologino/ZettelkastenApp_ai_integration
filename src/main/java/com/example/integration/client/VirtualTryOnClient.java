@@ -69,21 +69,24 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         String fitPromptHint = extractString(payload, "fitPromptHint");
         String figureLockPrompt = extractString(payload, "figureLockPrompt");
         String clothingSize = extractString(payload, "clothingSize");
-        String enrichedPrompt = buildTryOnPrompt(
-            basePrompt,
-            garmentBrand,
-            garmentTitle,
-            garmentCategory,
-            selectedSize,
-            personImage,
-            garmentImage,
-            extractInteger(payload, "heightCm"),
-            extractInteger(payload, "bustCm"),
-            extractInteger(payload, "waistCm"),
-            extractInteger(payload, "hipsCm"),
-            clothingSize,
-            fitPromptHint
-        );
+        boolean structuredPrompt = isStructuredWibestylePrompt(basePrompt);
+        String enrichedPrompt = structuredPrompt
+            ? basePrompt.trim()
+            : buildTryOnPrompt(
+                basePrompt,
+                garmentBrand,
+                garmentTitle,
+                garmentCategory,
+                selectedSize,
+                personImage,
+                garmentImage,
+                extractInteger(payload, "heightCm"),
+                extractInteger(payload, "bustCm"),
+                extractInteger(payload, "waistCm"),
+                extractInteger(payload, "hipsCm"),
+                clothingSize,
+                fitPromptHint
+            );
 
         String skipGrokReason = grokSkipReason(network, personImage, garmentImage);
         if (skipGrokReason == null) {
@@ -97,7 +100,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                 "virtual_try_on_grok keySource=" + keySource
             );
             String editPrompt = buildGrokEditPrompt(
-                basePrompt,
+                structuredPrompt ? enrichedPrompt : basePrompt,
                 garmentBrand,
                 garmentTitle,
                 garmentCategory,
@@ -107,11 +110,17 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                 extractInteger(payload, "waistCm"),
                 extractInteger(payload, "hipsCm"),
                 clothingSize,
-                figureLockPrompt,
-                fitPromptHint,
+                structuredPrompt ? null : figureLockPrompt,
+                structuredPrompt ? null : fitPromptHint,
                 false
             );
-            log.info("Virtual try-on via Grok Imagine edit, keySource={}, promptLen={}", keySource, editPrompt.length());
+            log.info(
+                "Virtual try-on via Grok Imagine edit, keySource={}, promptLen={}, structured={}, preview={}",
+                keySource,
+                editPrompt.length(),
+                structuredPrompt,
+                promptPreview(editPrompt)
+            );
             try {
                 xaiApiKeyResolver.resolve(network).ifPresent(BaseNeuralClient::setUserApiKey);
                 Map<String, Object> generated = tryGrokEdit(network, payload, editPrompt);
@@ -126,7 +135,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                     log.warn("Grok content moderation (keySource={}), retrying with retail-safe prompt", keySource);
                     try {
                         String safePrompt = buildGrokEditPrompt(
-                            basePrompt,
+                            structuredPrompt ? enrichedPrompt : basePrompt,
                             garmentBrand,
                             garmentTitle,
                             garmentCategory,
@@ -136,8 +145,8 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                             extractInteger(payload, "waistCm"),
                             extractInteger(payload, "hipsCm"),
                             clothingSize,
-                            figureLockPrompt,
-                            fitPromptHint,
+                            structuredPrompt ? null : figureLockPrompt,
+                            structuredPrompt ? null : fitPromptHint,
                             true
                         );
                         Map<String, Object> generated = tryGrokEdit(network, payload, safePrompt);
@@ -242,6 +251,23 @@ public class VirtualTryOnClient extends BaseNeuralClient {
     private static boolean apiUrlPointsToXai(NeuralNetwork network) {
         String apiUrl = network.getApiUrl();
         return apiUrl != null && apiUrl.toLowerCase().contains("x.ai");
+    }
+
+    private static boolean isStructuredWibestylePrompt(String prompt) {
+        if (prompt == null || prompt.isBlank()) {
+            return false;
+        }
+        return prompt.contains("ДАННЫЕ ПРИМЕРКИ")
+            || prompt.contains("Виртуальная примерка")
+            || prompt.contains("\"figureLock\"");
+    }
+
+    private static String promptPreview(String prompt) {
+        if (prompt == null || prompt.isBlank()) {
+            return "";
+        }
+        String oneLine = prompt.replace('\n', ' ').replaceAll("\\s+", " ").trim();
+        return oneLine.length() <= 120 ? oneLine : oneLine.substring(0, 120) + "…";
     }
 
     private Map<String, Object> tryGrokEdit(NeuralNetwork network, Map<String, Object> payload, String editPrompt) throws Exception {
