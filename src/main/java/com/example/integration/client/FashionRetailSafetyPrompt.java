@@ -62,7 +62,7 @@ public final class FashionRetailSafetyPrompt {
     private static String describeGarment(String garmentTitle, String garmentCategory) {
         StringBuilder builder = new StringBuilder();
         if (garmentTitle != null && !garmentTitle.isBlank()) {
-            builder.append(garmentTitle.trim());
+            builder.append(GarmentTitleSanitizer.forPrompt(garmentTitle.trim()));
         } else {
             builder.append("women's apparel");
         }

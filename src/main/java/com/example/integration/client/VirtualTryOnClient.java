@@ -61,7 +61,7 @@ public class VirtualTryOnClient extends BaseNeuralClient {
             xaiKeyPresent,
             "evaluating keySource=" + keySource
         );
-        String garmentTitle = extractString(payload, "garmentTitle");
+        String garmentTitle = GarmentTitleSanitizer.forPrompt(extractString(payload, "garmentTitle"));
         String garmentBrand = extractString(payload, "garmentBrand");
         String garmentCategory = extractString(payload, "garmentCategory");
         String selectedSize = extractString(payload, "selectedSize");
