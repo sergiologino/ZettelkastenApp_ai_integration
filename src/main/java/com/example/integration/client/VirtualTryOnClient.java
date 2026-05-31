@@ -307,7 +307,9 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         builder.append("Overlay the marketplace garment from image2 on the person; person must be fully dressed in that product. ");
         builder.append("Remove previous outfit from view — person wears only the retail product, appropriately covered. ");
         builder.append(
-            "Preserve the same person identity, face, hair, skin tone from image1. "
+            "Preserve the same person identity, face, hair, skin tone from image1 only — "
+                + "never copy or blend the face from image2 even when a catalog model is visible on the product photo. "
+                + "image2 supplies garment only; ignore the model's face and body on image2. "
                 + "BODY FIGURE PRIORITY: keep full bust volume, hip width and waist curve from image1 — "
                 + "never slim breasts, hips or thighs to fit the garment. "
                 + "Do not turn a curvy EU 50–52 body into a EU 44–46 silhouette. "
