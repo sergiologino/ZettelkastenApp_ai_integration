@@ -22,6 +22,7 @@ public class NetworkDTO {
     private Map<String, Object> responseMapping;
     private String connectionInstruction;
     private java.math.BigDecimal costPerTokenRub;
+    private java.math.BigDecimal costPerTokenUsd;
     private java.math.BigDecimal wordsPerToken;
     private java.math.BigDecimal secondsPerToken;
     private LocalDateTime createdAt;

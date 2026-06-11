@@ -54,6 +54,9 @@ public class RequestLog {
     
     @Column(name = "tokens_used")
     private Integer tokensUsed;
+
+    @Column(name = "cost_usd", precision = 19, scale = 8)
+    private java.math.BigDecimal costUsd;
     
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -62,10 +65,21 @@ public class RequestLog {
     private LocalDateTime completedAt;
     
     public void markCompleted(String status, Map<String, Object> response, Integer executionTime, Integer tokens) {
+        markCompleted(status, response, executionTime, tokens, null);
+    }
+
+    public void markCompleted(
+        String status,
+        Map<String, Object> response,
+        Integer executionTime,
+        Integer tokens,
+        java.math.BigDecimal costUsd
+    ) {
         this.status = status;
         this.responsePayload = response;
         this.executionTimeMs = executionTime;
         this.tokensUsed = tokens;
+        this.costUsd = costUsd;
         this.completedAt = LocalDateTime.now();
     }
     

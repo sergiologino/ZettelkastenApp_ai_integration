@@ -25,6 +25,8 @@ public class VirtualTryOnClient extends BaseNeuralClient {
 
     private final PollinationsClient pollinationsClient;
     private final XaiImagineEditClient xaiImagineEditClient;
+    private final FashnClient fashnClient;
+    private final KlingVirtualTryOnClient klingVirtualTryOnClient;
     private final XaiApiKeyResolver xaiApiKeyResolver;
 
     public VirtualTryOnClient(
@@ -33,11 +35,15 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         EncryptionService encryptionService,
         PollinationsClient pollinationsClient,
         XaiImagineEditClient xaiImagineEditClient,
+        FashnClient fashnClient,
+        KlingVirtualTryOnClient klingVirtualTryOnClient,
         XaiApiKeyResolver xaiApiKeyResolver
     ) {
         super(restTemplate, objectMapper, encryptionService);
         this.pollinationsClient = pollinationsClient;
         this.xaiImagineEditClient = xaiImagineEditClient;
+        this.fashnClient = fashnClient;
+        this.klingVirtualTryOnClient = klingVirtualTryOnClient;
         this.xaiApiKeyResolver = xaiApiKeyResolver;
     }
 
@@ -87,6 +93,14 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                 clothingSize,
                 fitPromptHint
             );
+
+        String tryOnBackend = resolveTryOnBackend(network);
+        if (tryOnBackend.startsWith("fashn")) {
+            return delegateTryOn(fashnClient, network, payload, "virtual_try_on_fashn", tryOnBackend);
+        }
+        if (tryOnBackend.startsWith("kling")) {
+            return delegateTryOn(klingVirtualTryOnClient, network, payload, "virtual_try_on_kling", tryOnBackend);
+        }
 
         String skipGrokReason = grokSkipReason(network, personImage, garmentImage);
         if (skipGrokReason == null) {
@@ -239,13 +253,40 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         return xaiApiKeyResolver.resolve(network).isPresent();
     }
 
-    private boolean isGrokBackend(NeuralNetwork network) {
+    private Map<String, Object> delegateTryOn(
+        BaseNeuralClient client,
+        NeuralNetwork network,
+        Map<String, Object> payload,
+        String provider,
+        String tryOnBackend
+    ) throws Exception {
+        AiTrafficLogger.logTryOnRoute(
+            network.getName(),
+            payload.get("personImageBase64") != null,
+            payload.get("garmentImageBase64") != null,
+            false,
+            false,
+            true,
+            provider + " backend=" + tryOnBackend
+        );
+        Map<String, Object> generated = client.sendRequest(network, payload);
+        Map<String, Object> result = new HashMap<>(generated);
+        result.putIfAbsent("provider", provider);
+        result.putIfAbsent("tryOnRoute", tryOnBackend);
+        return result;
+    }
+
+    private static String resolveTryOnBackend(NeuralNetwork network) {
         Map<String, Object> map = network.getRequestMapping();
         if (map == null || map.isEmpty()) {
-            return false;
+            return "grok-imagine-edit";
         }
         Object backend = map.get("tryOnBackend");
-        return backend != null && backend.toString().toLowerCase().contains("grok");
+        return backend != null ? backend.toString().toLowerCase() : "grok-imagine-edit";
+    }
+
+    private boolean isGrokBackend(NeuralNetwork network) {
+        return resolveTryOnBackend(network).contains("grok");
     }
 
     private static boolean apiUrlPointsToXai(NeuralNetwork network) {

@@ -16,6 +16,8 @@ public class RequestLogDTO {
     public boolean success;
     public String errorMessage;
     public Integer tokensUsed;
+    public java.math.BigDecimal costUsd;
+    public String provider;
     public LocalDateTime createdAt;
 
     public RequestLogDTO() {}
@@ -33,6 +35,8 @@ public class RequestLogDTO {
             boolean success,
             String errorMessage,
             Integer tokensUsed,
+            java.math.BigDecimal costUsd,
+            String provider,
             LocalDateTime createdAt
     ) {
         this.id = id;
@@ -47,6 +51,8 @@ public class RequestLogDTO {
         this.success = success;
         this.errorMessage = errorMessage;
         this.tokensUsed = tokensUsed;
+        this.costUsd = costUsd;
+        this.provider = provider;
         this.createdAt = createdAt;
     }
 }

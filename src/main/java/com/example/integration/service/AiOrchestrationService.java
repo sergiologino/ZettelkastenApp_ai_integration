@@ -10,6 +10,8 @@ import com.example.integration.model.*;
 import com.example.integration.repository.*;
 import com.example.integration.support.AiPayloadLogSupport;
 import com.example.integration.support.AiTrafficLogger;
+import com.example.integration.support.TokenUsageExtractor;
+import com.example.integration.support.UsageCostCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -147,8 +149,9 @@ public class AiOrchestrationService {
                 Map<String, Object> response = client.sendRequest(network, request.getPayload());
                 ttsEnrichmentService.enrichChatResponseIfRequested(request, response);
 
-                // 5. Извлечь количество токенов
-                Integer tokensUsed = extractTokensFromResponse(response);
+                // 5. Извлечь количество токенов и стоимость
+                Integer tokensUsed = TokenUsageExtractor.extract(response);
+                java.math.BigDecimal costUsd = UsageCostCalculator.costUsd(network, tokensUsed);
                 
                 // 6. Обновить счётчик использования
                 rateLimitService.recordUsage(user, network, tokensUsed);
@@ -156,7 +159,7 @@ public class AiOrchestrationService {
                 // 7. Обновить лог
                 int executionTime = (int) (System.currentTimeMillis() - startTime);
                 Map<String, Object> sanitizedResponse = AiPayloadLogSupport.sanitize(response);
-                requestLog.markCompleted("success", sanitizedResponse, executionTime, tokensUsed);
+                requestLog.markCompleted("success", sanitizedResponse, executionTime, tokensUsed, costUsd);
                 requestLogRepository.save(requestLog);
                 AiTrafficLogger.logOutgoing(
                     requestLogId,
@@ -300,16 +303,6 @@ public class AiOrchestrationService {
         log.setRequestPayload(AiPayloadLogSupport.sanitize(request.getPayload()));
         log.setStatus("pending");
         return requestLogRepository.save(log);
-    }
-    
-    private Integer extractTokensFromResponse(Map<String, Object> response) {
-        if (response.containsKey("usage") && response.get("usage") instanceof Map<?, ?> usage) {
-            Object totalTokens = usage.get("total_tokens");
-            if (totalTokens instanceof Number n) {
-                return n.intValue();
-            }
-        }
-        return 0;
     }
     
     private AiResponseDTO buildResponse(

@@ -77,6 +77,7 @@ public class NetworkManagementService {
         network.setResponseMapping(request.getResponseMapping());
         network.setConnectionInstruction(request.getConnectionInstruction());
         network.setCostPerTokenRub(request.getCostPerTokenRub());
+        network.setCostPerTokenUsd(request.getCostPerTokenUsd());
         network.setWordsPerToken(request.getWordsPerToken());
         network.setSecondsPerToken(request.getSecondsPerToken());
         
@@ -114,6 +115,7 @@ public class NetworkManagementService {
         network.setResponseMapping(request.getResponseMapping());
         network.setConnectionInstruction(request.getConnectionInstruction());
         network.setCostPerTokenRub(request.getCostPerTokenRub());
+        network.setCostPerTokenUsd(request.getCostPerTokenUsd());
         network.setWordsPerToken(request.getWordsPerToken());
         network.setSecondsPerToken(request.getSecondsPerToken());
         
@@ -147,6 +149,7 @@ public class NetworkManagementService {
         dto.setResponseMapping(network.getResponseMapping());
         dto.setConnectionInstruction(network.getConnectionInstruction());
         dto.setCostPerTokenRub(network.getCostPerTokenRub());
+        dto.setCostPerTokenUsd(network.getCostPerTokenUsd());
         dto.setWordsPerToken(network.getWordsPerToken());
         dto.setSecondsPerToken(network.getSecondsPerToken());
         dto.setCreatedAt(network.getCreatedAt());

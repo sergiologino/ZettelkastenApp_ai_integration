@@ -216,7 +216,33 @@ GET {BASE_URL}/actuator/health
 
 Ответ в `response`: **`audioBase64`**, **`format`**, **`lang`**, **`voice`**.
 
-### 7.5. Прочие типы
+### 7.5. Virtual try-on (`requestType`: `image_generation` или `video_generation`)
+
+Сценарий: **ваше фото человека + фото вещи → тот же человек в этой вещи** (фото или видео).
+
+| Сеть | Тип | Результат |
+|------|-----|-----------|
+| `fashn-tryon-max` | `image_generation` | Фото (FASHN tryon-max) |
+| `fashn-tryon-video` | `video_generation` | Видео 5–10 с (tryon-max → image-to-video) |
+| `kling-kolors-tryon` | `image_generation` | Фото (Kling Kolors) |
+| `kling-tryon-video` | `video_generation` | Видео (Kling try-on → image2video) |
+
+`fashn-product-to-model` — **не** для вашего сценария: генерирует новую модель с flat-lay, а не надевает вещь на вашего человека.
+
+Обязательный **`payload`**:
+
+| Поле | Описание |
+|------|----------|
+| `personImageBase64` | Фото вашего человека (base64 или data URI) |
+| `garmentImageBase64` | Фото вещи с карточки/flat-lay |
+| `prompt` | Опционально: «open jacket», поза, фон |
+| `durationSec` / `duration` | Для видео: 5 или 10 |
+| `videoResolution` | FASHN: `480p`, `720p`, `1080p` |
+| `outputMode: "video"` | Альтернатива: на фото-сети можно передать `"video"` для двухшагового пайплайна |
+
+Ответ: `imageBase64` (фото) или `videoBase64` (видео), плюс `tokensUsed` / `creditsUsed`.
+
+### 7.6. Прочие типы
 
 `embedding`, `image_generation`, `video_generation` — смотрите соответствующий `*Client.java` и настройки сети в админке (`apiUrl`, `modelName`, маппинги).
 

@@ -64,6 +64,9 @@ public class NetworkCreateRequest {
     
     @Schema(description = "Себестоимость одного токена в рублях (курс: 1 USD = 90 RUB)", example = "0.000045")
     private java.math.BigDecimal costPerTokenRub;
+
+    @Schema(description = "Cost of one token/credit in USD", example = "0.000002")
+    private java.math.BigDecimal costPerTokenUsd;
     
     @Schema(description = "Примерное количество слов в одном токене (для текстовых моделей)", example = "0.75")
     private java.math.BigDecimal wordsPerToken;

@@ -26,6 +26,8 @@
 - Админ- и AI-API в OpenAPI; Swagger UI: `/swagger-ui/**`, спецификация: `/v3/api-docs`. Actuator: `/actuator/health`, `/actuator/prometheus`.
 - **Dockerfile**: runtime-образ `eclipse-temurin:17-jdk-jammy` (заменён устаревший `openjdk:17-jdk-slim`).
 - **Social posting API**: клиентский endpoint `POST /api/social/posts` под `X-API-Key` публикует посты в Telegram, Facebook и X. Для Telegram поддержаны текст, одиночные файлы/изображения/видео и несколько вложений через `attachments[]` (`base64` или `url`); сервис сам выбирает `sendMessage`, `sendPhoto`, `sendVideo`, `sendDocument` или `sendMediaGroup`. Ключи платформ и содержимое файлов не сохраняются; результаты логируются в `request_logs` с `request_type = social_post:<platform>`. Админская статистика: `GET /api/admin/social/stats`; во фронте добавлен только блок статистики, без настроек ключей.
+- **Virtual try-on**: `VirtualTryOnClient` (Grok Imagine + Pollinations fallback), **FASHN** (`FashnClient`: person+garment photo `tryon-max`, video `tryon-max→image-to-video`), **Kling** (`KlingVirtualTryOnClient`: person+garment photo Kolors, video `try-on→image2video`). Сети: `fashn-tryon-max`, `fashn-tryon-video`, `kling-kolors-tryon`, `kling-tryon-video` (V023). `fashn-product-to-model` — только flat-lay→новая модель, не ваш человек.
+- **Учёт токенов и USD**: `TokenUsageExtractor` (поля `tokensUsed`, `creditsUsed`, `usage.total_tokens`), колонка `request_logs.cost_usd`, `neural_networks.cost_per_token_usd`. Админ-статистика `/api/admin/stats`: `monthlyTokensByProvider`, `monthlyCostUsdByProvider`, `providerDetails`. Фронт `ai-integration-front`: колонки токенов/USD в логах, блок «за месяц по провайдерам» в статистике.
 
 ## План и бэклог (из README и кода)
 

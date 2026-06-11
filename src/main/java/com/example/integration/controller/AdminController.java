@@ -20,6 +20,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -203,10 +205,13 @@ public class AdminController {
         Page<com.example.integration.dto.RequestLogDTO> dtoPage = logs.map(log -> {
             var nn = log.getNeuralNetwork();
             var client = log.getClientApp();
-            String externalUserId = (log.getExternalUser() != null) ? String.valueOf(log.getExternalUser().getId()) : null;
+            String externalUserId = (log.getExternalUser() != null)
+                ? log.getExternalUser().getExternalUserId()
+                : null;
             String prompt = (log.getRequestPayload() != null) ? log.getRequestPayload().toString() : null;
             String response = (log.getResponsePayload() != null) ? log.getResponsePayload().toString() : null;
             boolean success = "success".equalsIgnoreCase(log.getStatus());
+            String provider = nn != null ? nn.getProvider() : null;
             return new com.example.integration.dto.RequestLogDTO(
                 log.getId(),
                 externalUserId,
@@ -220,6 +225,8 @@ public class AdminController {
                 success,
                 log.getErrorMessage(),
                 log.getTokensUsed(),
+                log.getCostUsd(),
+                provider,
                 log.getCreatedAt()
             );
         });
@@ -452,6 +459,78 @@ public class AdminController {
             );
             clientDetails.add(clientDetail);
         }
+
+        java.math.BigDecimal totalCostUsd = java.math.BigDecimal.ZERO;
+        YearMonth currentMonth = YearMonth.now();
+        LocalDateTime monthStart = currentMonth.atDay(1).atStartOfDay();
+        LocalDateTime monthEnd = currentMonth.plusMonths(1).atDay(1).atStartOfDay();
+        long monthlyTotalTokensUsed = 0L;
+        java.math.BigDecimal monthlyTotalCostUsd = java.math.BigDecimal.ZERO;
+        java.util.Map<String, Long> monthlyTokensByProvider = new java.util.HashMap<>();
+        java.util.Map<String, java.math.BigDecimal> monthlyCostUsdByProvider = new java.util.HashMap<>();
+        java.util.Map<String, java.util.List<RequestLog>> logsByProvider = new java.util.HashMap<>();
+
+        for (RequestLog log : allLogs) {
+            if (log.getCostUsd() != null) {
+                totalCostUsd = totalCostUsd.add(log.getCostUsd());
+            }
+
+            if (log.getNeuralNetwork() == null || log.getCreatedAt() == null) {
+                continue;
+            }
+            boolean inCurrentMonth = !log.getCreatedAt().isBefore(monthStart) && log.getCreatedAt().isBefore(monthEnd);
+            if (!inCurrentMonth) {
+                continue;
+            }
+
+            String provider = normalizeProvider(log.getNeuralNetwork().getProvider());
+            logsByProvider.computeIfAbsent(provider, key -> new java.util.ArrayList<>()).add(log);
+
+            if (log.getTokensUsed() != null && log.getTokensUsed() > 0) {
+                monthlyTotalTokensUsed += log.getTokensUsed();
+                monthlyTokensByProvider.merge(provider, (long) log.getTokensUsed(), Long::sum);
+            }
+            if (log.getCostUsd() != null && log.getCostUsd().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                monthlyTotalCostUsd = monthlyTotalCostUsd.add(log.getCostUsd());
+                monthlyCostUsdByProvider.merge(provider, log.getCostUsd(), java.math.BigDecimal::add);
+            }
+        }
+
+        java.util.List<ProviderStatsDetailDto> providerDetails = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<String, java.util.List<RequestLog>> entry : logsByProvider.entrySet()) {
+            java.util.List<RequestLog> providerLogs = entry.getValue();
+            long providerRequests = providerLogs.size();
+            long providerSuccessful = providerLogs.stream().filter(log -> "success".equals(log.getStatus())).count();
+            long providerFailed = providerLogs.stream().filter(log -> "failed".equals(log.getStatus())).count();
+            long providerTokens = providerLogs.stream()
+                .filter(log -> log.getTokensUsed() != null)
+                .mapToLong(RequestLog::getTokensUsed)
+                .sum();
+            java.math.BigDecimal providerCostUsd = providerLogs.stream()
+                .map(RequestLog::getCostUsd)
+                .filter(cost -> cost != null)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+            java.math.BigDecimal providerCostRub = providerLogs.stream()
+                .filter(log -> log.getNeuralNetwork() != null && log.getTokensUsed() != null && log.getTokensUsed() > 0)
+                .map(log -> {
+                    java.math.BigDecimal costPerToken = log.getNeuralNetwork().getCostPerTokenRub();
+                    if (costPerToken == null || costPerToken.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                        return java.math.BigDecimal.ZERO;
+                    }
+                    return costPerToken.multiply(java.math.BigDecimal.valueOf(log.getTokensUsed()));
+                })
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+            providerDetails.add(new ProviderStatsDetailDto(
+                entry.getKey(),
+                providerRequests,
+                providerSuccessful,
+                providerFailed,
+                providerTokens,
+                providerCostUsd,
+                providerCostRub
+            ));
+        }
         
         AdminStatsDTO stats = new AdminStatsDTO(
             totalRequests,
@@ -459,17 +538,30 @@ public class AdminController {
             failedRequests,
             totalTokensUsed,
             totalCostRub,
+            totalCostUsd,
+            monthlyTotalTokensUsed,
+            monthlyTotalCostUsd,
             requestsByNetwork,
             requestsByClient,
             tokensByNetwork,
             costByNetwork,
             tokensByClient,
             costByClient,
+            monthlyTokensByProvider,
+            monthlyCostUsdByProvider,
             networkDetails,
-            clientDetails
+            clientDetails,
+            providerDetails
         );
         
         return ResponseEntity.ok(stats);
+    }
+
+    private static String normalizeProvider(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return "unknown";
+        }
+        return provider.trim().toLowerCase();
     }
 
     @GetMapping("/social/stats")

@@ -75,6 +75,9 @@ public class NeuralNetwork {
     
     @Column(name = "cost_per_token_rub", precision = 19, scale = 8)
     private java.math.BigDecimal costPerTokenRub; // Себестоимость одного токена в рублях
+
+    @Column(name = "cost_per_token_usd", precision = 19, scale = 8)
+    private java.math.BigDecimal costPerTokenUsd;
     
     @Column(name = "words_per_token", precision = 10, scale = 4)
     private java.math.BigDecimal wordsPerToken; // Примерное количество слов в одном токене (для текстовых моделей)

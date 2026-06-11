@@ -17,13 +17,19 @@ public class AdminStatsDTO {
     private Long failedRequests;
     private Long totalTokensUsed;
     private BigDecimal totalCostRub; // Общая стоимость всех запросов в рублях
+    private BigDecimal totalCostUsd;
+    private Long monthlyTotalTokensUsed;
+    private BigDecimal monthlyTotalCostUsd;
     private Map<String, Long> requestsByNetwork;
     private Map<String, Long> requestsByClient;
     private Map<String, Long> tokensByNetwork; // Токены по нейросетям
     private Map<String, BigDecimal> costByNetwork; // Стоимость по нейросетям
     private Map<String, Long> tokensByClient; // Токены по клиентам
     private Map<String, BigDecimal> costByClient; // Стоимость по клиентам
+    private Map<String, Long> monthlyTokensByProvider;
+    private Map<String, BigDecimal> monthlyCostUsdByProvider;
     private List<NetworkStatsDetailDto> networkDetails; // Детальная статистика по нейросетям
     private List<ClientStatsDetailDto> clientDetails; // Детальная статистика по клиентам
+    private List<ProviderStatsDetailDto> providerDetails;
 }
 

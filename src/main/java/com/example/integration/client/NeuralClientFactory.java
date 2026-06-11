@@ -19,6 +19,8 @@ public class NeuralClientFactory {
     private final DeepSeekClient deepSeekClient;
     private final PollinationsClient pollinationsClient;
     private final VirtualTryOnClient virtualTryOnClient;
+    private final FashnClient fashnClient;
+    private final KlingVirtualTryOnClient klingVirtualTryOnClient;
     private final SeasonHitVideoClient seasonHitVideoClient;
     
     public NeuralClientFactory(
@@ -32,6 +34,8 @@ public class NeuralClientFactory {
         DeepSeekClient deepSeekClient,
         PollinationsClient pollinationsClient,
         VirtualTryOnClient virtualTryOnClient,
+        FashnClient fashnClient,
+        KlingVirtualTryOnClient klingVirtualTryOnClient,
         SeasonHitVideoClient seasonHitVideoClient
     ) {
         this.openAiClient = openAiClient;
@@ -44,6 +48,8 @@ public class NeuralClientFactory {
         this.deepSeekClient = deepSeekClient;
         this.pollinationsClient = pollinationsClient;
         this.virtualTryOnClient = virtualTryOnClient;
+        this.fashnClient = fashnClient;
+        this.klingVirtualTryOnClient = klingVirtualTryOnClient;
         this.seasonHitVideoClient = seasonHitVideoClient;
     }
     
@@ -64,6 +70,8 @@ public class NeuralClientFactory {
             case "deepseek" -> deepSeekClient;
             case "pollinations" -> pollinationsClient;
             case "virtual_try_on", "virtual-try-on", "wibestyle" -> virtualTryOnClient;
+            case "fashn" -> fashnClient;
+            case "kling", "kling_vton", "kling-vton" -> klingVirtualTryOnClient;
             case "season_hit_video", "season-hit-video", "wibestyle_video" -> seasonHitVideoClient;
             case "google", "xai" -> openAiClient;
             default -> throw new IllegalArgumentException("Unknown provider: " + provider);
