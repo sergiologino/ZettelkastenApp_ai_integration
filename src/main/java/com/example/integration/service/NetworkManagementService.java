@@ -66,6 +66,11 @@ public class NetworkManagementService {
             String encryptedKey = encryptionService.encrypt(request.getApiKey());
             network.setApiKeyEncrypted(encryptedKey);
         }
+
+        if (request.getApiSecret() != null && !request.getApiSecret().isEmpty()) {
+            String encryptedSecret = encryptionService.encrypt(request.getApiSecret());
+            network.setApiSecretEncrypted(encryptedSecret);
+        }
         
         network.setModelName(request.getModelName());
         network.setIsActive(request.getIsActive());
@@ -104,6 +109,11 @@ public class NetworkManagementService {
             String encryptedKey = encryptionService.encrypt(request.getApiKey());
             network.setApiKeyEncrypted(encryptedKey);
         }
+
+        if (request.getApiSecret() != null && !request.getApiSecret().isEmpty()) {
+            String encryptedSecret = encryptionService.encrypt(request.getApiSecret());
+            network.setApiSecretEncrypted(encryptedSecret);
+        }
         
         network.setModelName(request.getModelName());
         network.setIsActive(request.getIsActive());
@@ -139,6 +149,7 @@ public class NetworkManagementService {
         dto.setProvider(network.getProvider());
         dto.setNetworkType(network.getNetworkType());
         dto.setApiUrl(network.getApiUrl());
+        dto.setHasApiSecret(network.getApiSecretEncrypted() != null && !network.getApiSecretEncrypted().isEmpty());
         dto.setModelName(network.getModelName());
         dto.setIsActive(network.getIsActive());
         dto.setIsFree(network.getIsFree());

@@ -37,6 +37,9 @@ public class NeuralNetwork {
     
     @Column(name = "api_key_encrypted", columnDefinition = "TEXT")
     private String apiKeyEncrypted;
+
+    @Column(name = "api_secret_encrypted", columnDefinition = "TEXT")
+    private String apiSecretEncrypted;
     
     @Column(name = "model_name", length = 100)
     private String modelName; // gpt-4, claude-3, etc.

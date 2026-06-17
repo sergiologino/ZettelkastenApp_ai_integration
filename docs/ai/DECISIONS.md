@@ -45,3 +45,13 @@
 **Контекст**: Это не AI-провайдеры и не требуют выбора сети/лимитов нейросетей. Секреты платформ по текущему контракту передаёт клиент в запросе; сервис использует их только для транзитного вызова и логирует результат без значений секретов. Для Telegram backend сам выбирает `sendMessage`/`sendPhoto`/`sendVideo`/`sendDocument`/`sendMediaGroup`; содержимое файлов в `request_logs` не сохраняется.
 
 **Статус**: Active.
+
+---
+
+## ADR-5: Второй секрет провайдера хранится в записи нейросети
+
+**Решение**: добавить универсальное поле `neural_networks.api_secret_encrypted` и передавать его через админский `NetworkCreateRequest.apiSecret`. Для Kling `apiKey` трактуется как Access Key, `apiSecret` как Secret Key; `KlingVirtualTryOnClient` генерирует HS256 JWT перед отправкой запроса.
+
+**Контекст**: у большинства провайдеров достаточно одного bearer/API key, но Kling требует пару Access Key + Secret Key и ожидает `Authorization: Bearer <jwt>`. Внешний контракт AI Integration Service для приложений (`POST /api/ai/process`, `X-API-Key`) менять нельзя.
+
+**Статус**: Active.

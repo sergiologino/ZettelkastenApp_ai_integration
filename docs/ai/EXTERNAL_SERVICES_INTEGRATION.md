@@ -229,6 +229,8 @@ GET {BASE_URL}/actuator/health
 
 `fashn-product-to-model` — **не** для вашего сценария: генерирует новую модель с flat-lay, а не надевает вещь на вашего человека.
 
+Для Kling в админке у сети `provider = kling` указываются два секрета провайдера: `apiKey` = Kling Access Key, `apiSecret` = Kling Secret Key. Клиентские приложения по-прежнему передают только `X-API-Key` сервиса интеграции; JWT для Kling (`iss=Access Key`, HS256 подпись `Secret Key`) формируется внутри `KlingVirtualTryOnClient`.
+
 Обязательный **`payload`**:
 
 | Поле | Описание |

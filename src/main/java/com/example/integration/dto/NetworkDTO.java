@@ -12,6 +12,7 @@ public class NetworkDTO {
     private String provider;
     private String networkType;
     private String apiUrl;
+    private Boolean hasApiSecret;
     private String modelName;
     private Boolean isActive;
     private Boolean isFree;

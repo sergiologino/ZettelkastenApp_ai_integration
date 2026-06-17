@@ -7,8 +7,13 @@ import com.example.integration.support.RemoteImageDownloader;
 import com.example.integration.support.RemoteVideoDownloader;
 import com.example.integration.support.TryOnImageSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +28,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Kling AI: person+garment try-on ({@code kolors-virtual-try-on}) and optional video ({@code image2video}).
@@ -37,6 +43,7 @@ public class KlingVirtualTryOnClient extends BaseNeuralClient {
     private static final String DEFAULT_VIDEO_MODEL = "kling-v1-6";
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(3);
     private static final Duration MAX_WAIT = Duration.ofMinutes(5);
+    private static final Duration JWT_TTL = Duration.ofMinutes(30);
 
     private final RemoteImageDownloader remoteImageDownloader;
     private final RemoteVideoDownloader remoteVideoDownloader;
@@ -82,7 +89,7 @@ public class KlingVirtualTryOnClient extends BaseNeuralClient {
             body.put("callback_url", callbackUrl);
         }
 
-        HttpHeaders headers = prepareHeaders(network);
+        HttpHeaders headers = prepareKlingHeaders(network);
         String submitUrl = resolveApiBase(network) + TRYON_PATH;
         log.info("Kling try-on: POST {} model={}", submitUrl, modelName);
 
@@ -142,7 +149,7 @@ public class KlingVirtualTryOnClient extends BaseNeuralClient {
             body.put("aspect_ratio", aspectRatio);
         }
 
-        HttpHeaders headers = prepareHeaders(network);
+        HttpHeaders headers = prepareKlingHeaders(network);
         String submitUrl = resolveApiBase(network) + IMAGE2VIDEO_PATH;
         log.info("Kling try-on video: POST {} model={}", submitUrl, videoModel);
 
@@ -177,7 +184,7 @@ public class KlingVirtualTryOnClient extends BaseNeuralClient {
     }
 
     private Map<String, Object> pollKlingTask(NeuralNetwork network, String statusUrl, boolean expectImages) throws InterruptedException {
-        HttpHeaders headers = prepareHeaders(network);
+        HttpHeaders headers = prepareKlingHeaders(network);
         long deadline = System.nanoTime() + MAX_WAIT.toNanos();
 
         while (System.nanoTime() < deadline) {
@@ -444,6 +451,41 @@ public class KlingVirtualTryOnClient extends BaseNeuralClient {
         if (code instanceof Number number && number.intValue() != 0) {
             throw new IllegalStateException("Kling API error: " + body.get("message"));
         }
+    }
+
+    private HttpHeaders prepareKlingHeaders(NeuralNetwork network) {
+        String accessKey = decryptRequired(network.getApiKeyEncrypted(), "Kling Access Key is not configured");
+        String secretKey = decryptRequired(network.getApiSecretEncrypted(), "Kling Secret Key is not configured");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(generateKlingJwt(accessKey, secretKey, Instant.now()));
+        return headers;
+    }
+
+    static String generateKlingJwt(String accessKey, String secretKey, Instant now) {
+        Instant notBefore = now.minusSeconds(5);
+        Instant expiresAt = now.plus(JWT_TTL);
+        SecretKeySpec signingKey = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+
+        return Jwts.builder()
+            .setHeaderParam("typ", "JWT")
+            .setIssuer(accessKey)
+            .setNotBefore(Date.from(notBefore))
+            .setExpiration(Date.from(expiresAt))
+            .signWith(signingKey, SignatureAlgorithm.HS256)
+            .compact();
+    }
+
+    private String decryptRequired(String encryptedValue, String message) {
+        if (encryptedValue == null || encryptedValue.isBlank()) {
+            throw new IllegalStateException(message);
+        }
+        String decrypted = encryptionService.decrypt(encryptedValue);
+        if (decrypted == null || decrypted.isBlank()) {
+            throw new IllegalStateException(message);
+        }
+        return decrypted;
     }
 
     private static String resolveApiBase(NeuralNetwork network) {

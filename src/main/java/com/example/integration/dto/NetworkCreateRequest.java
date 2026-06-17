@@ -32,6 +32,9 @@ public class NetworkCreateRequest {
     
     @Schema(description = "API ключ (будет зашифрован)", example = "sk-proj-your-openai-api-key-here")
     private String apiKey;
+
+    @Schema(description = "Additional provider secret if required, for example Kling Secret Key", example = "your-kling-secret-key")
+    private String apiSecret;
     
     @Schema(description = "Название модели", example = "gpt-4")
     private String modelName;

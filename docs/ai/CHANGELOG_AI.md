@@ -12,3 +12,4 @@
 - **2026-05-28**: Grok Imagine (virtual try-on): временные URL `imgen.x.ai` скачиваются в noteapp и отдаются клиенту как `imageBase64` (+ `data[].base64`); исходный URL сохраняется в `sourceImageUrl`. Остальные image-провайдеры без изменений.
 - **2026-05-28**: Season hit video: `SeasonHitVideoClient` (xAI `/v1/videos/generations` + poll), `RemoteVideoDownloader`, провайдер `season_hit_video`, миграция V021 `wibestyle-season-video`.
 - **2026-06-12**: FASHN/Kling person try-on: фото (`fashn-tryon-max`, `kling-kolors-tryon`) и видео (`fashn-tryon-video`, `kling-tryon-video`, пайплайн try-on → image-to-video). При наличии `personImageBase64` FASHN всегда использует tryon-max.
+- **2026-06-17**: Kling Access Key + Secret Key: добавлено хранение второго секрета провайдера (`api_secret_encrypted`), поле `apiSecret` в админском API/фронте и генерация Kling JWT внутри `KlingVirtualTryOnClient`. Контракт клиентских приложений (`X-API-Key`, `/api/ai/process`) не изменён.
