@@ -62,13 +62,15 @@ public class NetworkManagementService {
         network.setApiUrl(request.getApiUrl());
         
         // ✅ Шифруем API ключ перед сохранением в БД
-        if (request.getApiKey() != null && !request.getApiKey().isEmpty()) {
-            String encryptedKey = encryptionService.encrypt(request.getApiKey());
+        String apiKey = normalizeCredential(request.getApiKey());
+        if (apiKey != null) {
+            String encryptedKey = encryptionService.encrypt(apiKey);
             network.setApiKeyEncrypted(encryptedKey);
         }
 
-        if (request.getApiSecret() != null && !request.getApiSecret().isEmpty()) {
-            String encryptedSecret = encryptionService.encrypt(request.getApiSecret());
+        String apiSecret = normalizeCredential(request.getApiSecret());
+        if (apiSecret != null) {
+            String encryptedSecret = encryptionService.encrypt(apiSecret);
             network.setApiSecretEncrypted(encryptedSecret);
         }
         
@@ -105,13 +107,15 @@ public class NetworkManagementService {
         network.setApiUrl(request.getApiUrl());
         
         // ✅ Шифруем новый API ключ, если он предоставлен
-        if (request.getApiKey() != null && !request.getApiKey().isEmpty()) {
-            String encryptedKey = encryptionService.encrypt(request.getApiKey());
+        String apiKey = normalizeCredential(request.getApiKey());
+        if (apiKey != null) {
+            String encryptedKey = encryptionService.encrypt(apiKey);
             network.setApiKeyEncrypted(encryptedKey);
         }
 
-        if (request.getApiSecret() != null && !request.getApiSecret().isEmpty()) {
-            String encryptedSecret = encryptionService.encrypt(request.getApiSecret());
+        String apiSecret = normalizeCredential(request.getApiSecret());
+        if (apiSecret != null) {
+            String encryptedSecret = encryptionService.encrypt(apiSecret);
             network.setApiSecretEncrypted(encryptedSecret);
         }
         
@@ -149,6 +153,7 @@ public class NetworkManagementService {
         dto.setProvider(network.getProvider());
         dto.setNetworkType(network.getNetworkType());
         dto.setApiUrl(network.getApiUrl());
+        dto.setHasApiKey(hasText(network.getApiKeyEncrypted()));
         dto.setHasApiSecret(network.getApiSecretEncrypted() != null && !network.getApiSecretEncrypted().isEmpty());
         dto.setModelName(network.getModelName());
         dto.setIsActive(network.getIsActive());
@@ -166,6 +171,17 @@ public class NetworkManagementService {
         dto.setCreatedAt(network.getCreatedAt());
         dto.setUpdatedAt(network.getUpdatedAt());
         return dto;
+    }
+
+    private static String normalizeCredential(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
 
