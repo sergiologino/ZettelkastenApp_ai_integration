@@ -37,8 +37,10 @@ import javax.crypto.spec.SecretKeySpec;
 public class KlingVirtualTryOnClient extends BaseNeuralClient {
 
     private static final Logger log = LoggerFactory.getLogger(KlingVirtualTryOnClient.class);
-    private static final String TRYON_PATH = "/kling/v1/images/kolors-virtual-try-on";
-    private static final String IMAGE2VIDEO_PATH = "/kling/v1/videos/image2video";
+    private static final String DEFAULT_API_BASE = "https://api-singapore.klingai.com";
+    private static final String LEGACY_API_BASE = "https://api.klingai.com";
+    private static final String TRYON_PATH = "/v1/images/kolors-virtual-try-on";
+    private static final String IMAGE2VIDEO_PATH = "/v1/videos/image2video";
     private static final String DEFAULT_TRYON_MODEL = "kolors-virtual-try-on-v1-5";
     private static final String DEFAULT_VIDEO_MODEL = "kling-v1-6";
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(3);
@@ -90,7 +92,7 @@ public class KlingVirtualTryOnClient extends BaseNeuralClient {
         }
 
         HttpHeaders headers = prepareKlingHeaders(network);
-        String submitUrl = resolveApiBase(network) + TRYON_PATH;
+        String submitUrl = resolveTryOnSubmitUrl(network);
         log.info("Kling try-on: POST {} model={}", submitUrl, modelName);
 
         ResponseEntity<Map<String, Object>> startResponse = restTemplate.exchange(
@@ -150,7 +152,7 @@ public class KlingVirtualTryOnClient extends BaseNeuralClient {
         }
 
         HttpHeaders headers = prepareKlingHeaders(network);
-        String submitUrl = resolveApiBase(network) + IMAGE2VIDEO_PATH;
+        String submitUrl = resolveImageToVideoSubmitUrl(network);
         log.info("Kling try-on video: POST {} model={}", submitUrl, videoModel);
 
         ResponseEntity<Map<String, Object>> startResponse = restTemplate.exchange(
@@ -176,11 +178,11 @@ public class KlingVirtualTryOnClient extends BaseNeuralClient {
     }
 
     private Map<String, Object> pollTryOnTask(NeuralNetwork network, String taskId) throws InterruptedException {
-        return pollKlingTask(network, resolveApiBase(network) + TRYON_PATH + "/" + taskId, true);
+        return pollKlingTask(network, resolveTryOnSubmitUrl(network) + "/" + taskId, true);
     }
 
     private Map<String, Object> pollImage2VideoTask(NeuralNetwork network, String taskId) throws InterruptedException {
-        return pollKlingTask(network, resolveApiBase(network) + IMAGE2VIDEO_PATH + "/" + taskId, false);
+        return pollKlingTask(network, resolveImageToVideoSubmitUrl(network) + "/" + taskId, false);
     }
 
     private Map<String, Object> pollKlingTask(NeuralNetwork network, String statusUrl, boolean expectImages) throws InterruptedException {
@@ -488,15 +490,30 @@ public class KlingVirtualTryOnClient extends BaseNeuralClient {
         return decrypted;
     }
 
-    private static String resolveApiBase(NeuralNetwork network) {
+    static String resolveTryOnSubmitUrl(NeuralNetwork network) {
+        return resolveApiBase(network) + TRYON_PATH;
+    }
+
+    static String resolveImageToVideoSubmitUrl(NeuralNetwork network) {
+        return resolveApiBase(network) + IMAGE2VIDEO_PATH;
+    }
+
+    static String resolveApiBase(NeuralNetwork network) {
         String apiUrl = network.getApiUrl();
         if (apiUrl == null || apiUrl.isBlank()) {
-            return "https://api.klingai.com";
+            return DEFAULT_API_BASE;
         }
         String trimmed = apiUrl.endsWith("/") ? apiUrl.substring(0, apiUrl.length() - 1) : apiUrl;
-        if (trimmed.contains("/kling/v1")) {
-            int idx = trimmed.indexOf("/kling/v1");
-            return trimmed.substring(0, idx);
+        if (trimmed.equalsIgnoreCase(LEGACY_API_BASE)) {
+            return DEFAULT_API_BASE;
+        }
+        int versionPath = trimmed.indexOf("/v1/");
+        if (versionPath >= 0) {
+            return trimmed.substring(0, versionPath);
+        }
+        int legacyVersionPath = trimmed.indexOf("/kling/v1");
+        if (legacyVersionPath >= 0) {
+            return trimmed.substring(0, legacyVersionPath);
         }
         return trimmed;
     }
