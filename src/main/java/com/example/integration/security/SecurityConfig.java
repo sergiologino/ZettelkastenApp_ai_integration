@@ -29,7 +29,7 @@ public class SecurityConfig {
     private final ClientApplicationRepository clientApplicationRepository;
     private final JwtAuthFilter jwtAuthFilter;
     private static final List<String> FRONTEND_ORIGINS = List.of(
-        "https://sergiologino-ai-integration-front-cd2e.twc1.net"
+        "https://integration.neuromaster.pro"
     );
     
     public SecurityConfig(
