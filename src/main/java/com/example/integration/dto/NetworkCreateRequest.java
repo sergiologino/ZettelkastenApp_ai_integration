@@ -22,7 +22,7 @@ public class NetworkCreateRequest {
     @NotBlank(message = "Provider is required")
     private String provider;
     
-    @Schema(description = "Тип нейросети", example = "chat", allowableValues = {"chat", "transcription", "embedding", "image_generation", "video_generation"}, required = true)
+    @Schema(description = "Тип нейросети", example = "chat", allowableValues = {"chat", "transcription", "embedding", "image_generation", "image_edit", "video_generation", "speech_synthesis"}, required = true)
     @NotBlank(message = "Network type is required")
     private String networkType;
     

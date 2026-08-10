@@ -25,7 +25,7 @@ public class AiRequestDTO {
     @Schema(
         description = "Тип запроса", 
         example = "chat",
-        allowableValues = {"chat", "transcription", "embedding", "image_generation", "video_generation", "speech_synthesis"}
+        allowableValues = {"chat", "transcription", "embedding", "image_generation", "image_edit", "video_generation", "speech_synthesis"}
     )
     private String requestType;
     
@@ -41,4 +41,3 @@ public class AiRequestDTO {
     )
     private Map<String, String> metadata;
 }
-

@@ -6,7 +6,11 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -42,6 +46,10 @@ public class OpenAiClient extends BaseNeuralClient {
 
         if ("image_generation".equalsIgnoreCase(network.getNetworkType())) {
             return sendImageGenerationRequest(network, mappedPayload, settingsRaw);
+        }
+
+        if ("image_edit".equalsIgnoreCase(network.getNetworkType())) {
+            return sendImageEditRequest(network, mappedPayload, settingsRaw);
         }
 
         if (settingsRaw instanceof Map<?, ?> settingsMap) {
@@ -200,6 +208,135 @@ public class OpenAiClient extends BaseNeuralClient {
         return applyResponseMapping(responseBody, network.getResponseMapping());
     }
 
+    /**
+     * OpenAI GPT Image edit endpoint. The source image is sent as a multipart file,
+     * because /images/edits does not accept the JSON data-URL form used by chat vision.
+     */
+    private Map<String, Object> sendImageEditRequest(
+        NeuralNetwork network,
+        Map<String, Object> payload,
+        Object settingsRaw
+    ) throws Exception {
+        String prompt = extractPrompt(payload);
+        if (prompt == null || prompt.isBlank()) {
+            throw new IllegalArgumentException("Prompt is required for OpenAI image editing.");
+        }
+        String source = extractImageBase64(payload);
+        if (source == null || source.isBlank()) {
+            throw new IllegalArgumentException("Payload must include non-empty imageBase64 for OpenAI image editing.");
+        }
+
+        Map<String, Object> settings = extractSettings(settingsRaw);
+        String model = resolveModel(payload, network, "gpt-image-1.5");
+        String outputFormat = stringValue(payload.get("output_format"), stringValue(settings.get("outputFormat"), "jpeg"));
+        String contentType = stringValue(payload.get("imageContentType"), "image/jpeg");
+        byte[] imageBytes = decodeImageBase64(source);
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("model", model);
+        body.add("prompt", prompt);
+        body.add("image", namedImageResource(imageBytes, contentType));
+        body.add("input_fidelity", stringValue(payload.get("input_fidelity"), "high"));
+        body.add("quality", normalizeGptImageQuality(payload.get("quality"), settings.get("quality")));
+        body.add("output_format", outputFormat);
+        String size = deriveImageSize(settings);
+        if (size != null) {
+            body.add("size", size);
+        }
+
+        HttpHeaders headers = prepareHeaders(network);
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
+        String url = ensurePath(network.getApiUrl(), "/edits");
+        Objects.requireNonNull(url, "Resolved OpenAI image edit endpoint is null");
+
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+            url,
+            HttpMethod.POST,
+            request,
+            new ParameterizedTypeReference<Map<String, Object>>() {}
+        );
+        Map<String, Object> normalized = normalizeImageEditResponse(response.getBody(), model, outputFormat);
+        return applyResponseMapping(normalized, network.getResponseMapping());
+    }
+
+    private static String extractImageBase64(Map<String, Object> payload) {
+        for (String key : List.of("imageBase64", "image", "sourceImageBase64")) {
+            Object value = payload.get(key);
+            if (value instanceof String str && !str.isBlank()) {
+                return str.trim();
+            }
+        }
+        return null;
+    }
+
+    private static byte[] decodeImageBase64(String value) {
+        String normalized = value.trim();
+        int comma = normalized.indexOf(',');
+        if (normalized.startsWith("data:") && comma >= 0) {
+            normalized = normalized.substring(comma + 1);
+        }
+        try {
+            return Base64.getDecoder().decode(normalized);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("imageBase64 is not valid base64 data", ex);
+        }
+    }
+
+    private static ByteArrayResource namedImageResource(byte[] bytes, String contentType) {
+        String extension = contentType != null && contentType.toLowerCase(Locale.ROOT).contains("png") ? ".png" : ".jpg";
+        return new ByteArrayResource(bytes) {
+            @Override
+            public String getFilename() {
+                return "avatar-source" + extension;
+            }
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> normalizeImageEditResponse(Map<String, Object> raw, String model, String outputFormat) {
+        if (raw == null || !(raw.get("data") instanceof List<?> data) || data.isEmpty() || !(data.get(0) instanceof Map<?, ?> first)) {
+            throw new IllegalStateException("OpenAI image edit returned no image data");
+        }
+        Object base64 = first.get("b64_json");
+        if (!(base64 instanceof String value) || value.isBlank()) {
+            throw new IllegalStateException("OpenAI image edit returned no base64 image");
+        }
+        String contentType = "image/" + ("jpg".equalsIgnoreCase(outputFormat) ? "jpeg" : outputFormat);
+        Map<String, Object> image = new HashMap<>();
+        image.put("base64", value);
+        image.put("contentType", contentType);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("provider", "openai");
+        result.put("model", model);
+        result.put("imageBase64", value);
+        result.put("imageContentType", contentType);
+        result.put("data", List.of(image));
+        result.put("output", List.of(image));
+        if (raw.get("usage") != null) {
+            result.put("usage", raw.get("usage"));
+        }
+        return result;
+    }
+
+    private static String stringValue(Object value, String fallback) {
+        if (value instanceof String str && !str.isBlank()) {
+            return str.trim();
+        }
+        return fallback;
+    }
+
+    private static String normalizeGptImageQuality(Object directValue, Object settingsValue) {
+        String raw = stringValue(directValue, stringValue(settingsValue, "medium")).toLowerCase(Locale.ROOT);
+        return switch (raw) {
+            case "low", "medium", "high", "auto" -> raw;
+            case "standard" -> "medium";
+            case "hd" -> "high";
+            default -> "medium";
+        };
+    }
+
     private String extractPrompt(Map<String, Object> payload) {
         Object prompt = payload.get("prompt");
         if (prompt instanceof String str && !str.isBlank()) {
@@ -331,4 +468,3 @@ public class OpenAiClient extends BaseNeuralClient {
         return "https://" + url;
     }
 }
-
