@@ -239,7 +239,7 @@ public class OpenAiClient extends BaseNeuralClient {
         body.add("input_fidelity", stringValue(payload.get("input_fidelity"), "high"));
         body.add("quality", normalizeGptImageQuality(payload.get("quality"), settings.get("quality")));
         body.add("output_format", outputFormat);
-        String size = deriveImageSize(settings);
+        String size = deriveImageEditSize(settings);
         if (size != null) {
             body.add("size", size);
         }
@@ -428,6 +428,36 @@ public class OpenAiClient extends BaseNeuralClient {
      * Допустимые значения: 'standard', 'hd'.
      * Маппинг: 'high' -> 'hd', 'low' -> 'standard', иначе без изменений.
      */
+    private String deriveImageEditSize(Map<String, Object> settings) {
+        Integer width = toInt(settings.get("width"));
+        Integer height = toInt(settings.get("height"));
+        if (width != null && height != null) {
+            return normalizeEditSizeByAspect(width, height);
+        }
+        Object ratio = settings.get("aspectRatio");
+        if (ratio instanceof String str && !str.isBlank()) {
+            return switch (str) {
+                case "16:9" -> "1536x1024";
+                case "9:16", "3:4", "4:5" -> "1024x1536";
+                default -> "1024x1024";
+            };
+        }
+        return null;
+    }
+
+    private String normalizeEditSizeByAspect(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        double aspect = (double) width / (double) height;
+        if (Math.abs(aspect - 1.0) < 0.05) {
+            return "1024x1024";
+        }
+        if (aspect > 1.0) {
+            return "1536x1024";
+        }
+        return "1024x1536";
+    }
     private String normalizeQuality(Object qualityValue) {
         if (qualityValue == null) {
             return "standard";
