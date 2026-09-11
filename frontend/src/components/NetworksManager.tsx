@@ -79,7 +79,6 @@ export const NetworksManager: React.FC = () => {
     { value: 'whisper', label: 'Whisper' },
     { value: 'deepseek', label: 'DeepSeek' },
     { value: 'qwen', label: 'Qwen' },
-    { value: 'pollinations', label: 'Pollinations' },
     { value: 'stability', label: 'Stability AI' },
     { value: 'leonardo', label: 'Leonardo AI' },
     { value: 'midjourney', label: 'Midjourney' },
@@ -363,18 +362,6 @@ export const NetworksManager: React.FC = () => {
         },
         response: {
           text: 'Привет, это пример транскрипции аудио файла.'
-        }
-      },
-      pollinations: {
-        request: {
-          prompt: 'Synthwave city skyline at sunset, neon reflections',
-          ratio: '1:1',
-          style: 'vivid'
-        },
-        response: {
-          id: 'poll-789',
-          status: 'completed',
-          output: [{ url: 'https://cdn.pollinations.ai/image/abc123.png' }]
         }
       },
       stability: {

@@ -17,7 +17,6 @@ public class NeuralClientFactory {
     private final WhisperClient whisperClient;
     private final QwenClient qwenClient;
     private final DeepSeekClient deepSeekClient;
-    private final PollinationsClient pollinationsClient;
     private final VirtualTryOnClient virtualTryOnClient;
     private final FashnClient fashnClient;
     private final KlingVirtualTryOnClient klingVirtualTryOnClient;
@@ -32,7 +31,6 @@ public class NeuralClientFactory {
         WhisperClient whisperClient,
         QwenClient qwenClient,
         DeepSeekClient deepSeekClient,
-        PollinationsClient pollinationsClient,
         VirtualTryOnClient virtualTryOnClient,
         FashnClient fashnClient,
         KlingVirtualTryOnClient klingVirtualTryOnClient,
@@ -46,7 +44,6 @@ public class NeuralClientFactory {
         this.whisperClient = whisperClient;
         this.qwenClient = qwenClient;
         this.deepSeekClient = deepSeekClient;
-        this.pollinationsClient = pollinationsClient;
         this.virtualTryOnClient = virtualTryOnClient;
         this.fashnClient = fashnClient;
         this.klingVirtualTryOnClient = klingVirtualTryOnClient;
@@ -68,7 +65,6 @@ public class NeuralClientFactory {
             case "whisper" -> whisperClient;
             case "qwen" -> qwenClient;
             case "deepseek" -> deepSeekClient;
-            case "pollinations" -> pollinationsClient;
             case "virtual_try_on", "virtual-try-on", "wibestyle" -> virtualTryOnClient;
             case "fashn" -> fashnClient;
             case "kling", "kling_vton", "kling-vton" -> klingVirtualTryOnClient;

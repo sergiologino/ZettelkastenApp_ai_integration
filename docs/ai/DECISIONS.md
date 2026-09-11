@@ -55,3 +55,13 @@
 **Контекст**: у большинства провайдеров достаточно одного bearer/API key, но Kling требует пару Access Key + Secret Key и ожидает `Authorization: Bearer <jwt>`. Внешний контракт AI Integration Service для приложений (`POST /api/ai/process`, `X-API-Key`) менять нельзя.
 
 **Статус**: Active.
+
+---
+
+## ADR-6: Pollinations исключён из сервиса
+
+**Решение**: провайдер `pollinations` и URL `image.pollinations.ai`/`api.pollinations.ai` не используются как нейросеть и не допускаются как fallback. `PollinationsClient` удалён, `NeuralClientFactory` не маршрутизирует этот provider, `RateLimitService` исключает его из fallback-кандидатов, `VirtualTryOnClient` при недоступности Grok/FASHN/Kling возвращает явную ошибку. Миграция V027 удаляет старые записи Pollinations из БД.
+
+**Контекст**: по текущему контракту сервис не должен направлять запросы на Pollinations и не должен позволять использовать эту нейросеть напрямую или неявно через fallback.
+
+**Статус**: Active.

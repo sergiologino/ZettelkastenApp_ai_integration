@@ -5,9 +5,7 @@ import com.example.integration.security.EncryptionService;
 import com.example.integration.support.AiTrafficLogger;
 import com.example.integration.support.XaiApiKeyResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,15 +13,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * Virtual try-on: Grok Imagine multi-image edit when API key is configured,
- * otherwise text-only Pollinations (legacy, does not use reference photos).
+ * Virtual try-on: Grok Imagine multi-image edit or an explicitly configured dedicated try-on backend.
  */
 @Component
 public class VirtualTryOnClient extends BaseNeuralClient {
 
     private static final Logger log = LoggerFactory.getLogger(VirtualTryOnClient.class);
 
-    private final PollinationsClient pollinationsClient;
     private final XaiImagineEditClient xaiImagineEditClient;
     private final FashnClient fashnClient;
     private final KlingVirtualTryOnClient klingVirtualTryOnClient;
@@ -33,14 +29,12 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         RestTemplate restTemplate,
         ObjectMapper objectMapper,
         EncryptionService encryptionService,
-        PollinationsClient pollinationsClient,
         XaiImagineEditClient xaiImagineEditClient,
         FashnClient fashnClient,
         KlingVirtualTryOnClient klingVirtualTryOnClient,
         XaiApiKeyResolver xaiApiKeyResolver
     ) {
         super(restTemplate, objectMapper, encryptionService);
-        this.pollinationsClient = pollinationsClient;
         this.xaiImagineEditClient = xaiImagineEditClient;
         this.fashnClient = fashnClient;
         this.klingVirtualTryOnClient = klingVirtualTryOnClient;
@@ -181,58 +175,22 @@ public class VirtualTryOnClient extends BaseNeuralClient {
                         );
                     }
                 }
-                log.warn("Grok Imagine try-on failed (keySource={}), falling back to Pollinations: {}", keySource, ex.getMessage(), ex);
-                skipGrokReason = "grok_api_error: " + ex.getMessage();
+                throw new IllegalStateException("Grok Imagine try-on failed: " + ex.getMessage(), ex);
             } finally {
                 BaseNeuralClient.clearUserApiKey();
             }
         } else if (personImage != null && garmentImage != null) {
             log.warn(
-                "Grok skipped for network {}: {}. Using Pollinations text-only.",
+                "Grok skipped for network {}: {}.",
                 network.getName(),
                 skipGrokReason
             );
         }
 
-        AiTrafficLogger.logTryOnRoute(
-            network.getName(),
-            personImage != null,
-            garmentImage != null,
-            isGrokBackend(network),
-            apiUrlPointsToXai(network),
-            xaiKeyPresent,
-            "virtual_try_on_pollinations reason=" + (skipGrokReason != null ? skipGrokReason : "unknown")
-        );
         if (skipGrokReason != null && skipGrokReason.contains("VTON_CONTENT_MODERATION")) {
             throw new IllegalStateException(skipGrokReason);
         }
-
-        log.info("Virtual try-on via Pollinations text-only, promptLen={}", enrichedPrompt.length());
-
-        Map<String, Object> generationPayload = new HashMap<>();
-        generationPayload.put("prompt", enrichedPrompt);
-        if (payload.get("settings") instanceof Map<?, ?> settings) {
-            generationPayload.put("settings", settings);
-        } else {
-            generationPayload.put("settings", Map.of("aspectRatio", "3:4", "width", 768, "height", 1024));
-        }
-        generationPayload.put(
-            "negative_prompt",
-            "underwear, lingerie, white bra, white panties, wrong outfit, different person, "
-                + "blurry, distorted body, extra limbs, watermark, text, logo, collage, low quality, deformed face"
-        );
-
-        NeuralNetwork imageNetwork = resolvePollinationsNetwork(network);
-        Map<String, Object> generated = pollinationsClient.sendRequest(imageNetwork, generationPayload);
-
-        Map<String, Object> result = new HashMap<>(generated);
-        result.put("provider", "virtual_try_on_pollinations");
-        result.put("tryOnRoute", "pollinations_text");
-        result.put("tryOnRouteReason", skipGrokReason != null ? skipGrokReason : "pollinations_fallback");
-        result.put("xaiKeySource", keySource);
-        result.put("prompt", enrichedPrompt);
-        result.put("data", extractOutputAsData(generated));
-        return result;
+        throw new IllegalStateException("Virtual try-on requires Grok Imagine or dedicated FASHN/Kling backend: " + skipGrokReason);
     }
 
     /** null = Grok should run; otherwise human-readable skip reason. */
@@ -378,22 +336,6 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         return builder.toString().replaceAll("\\s+", " ").trim();
     }
 
-    private NeuralNetwork resolvePollinationsNetwork(NeuralNetwork network) {
-        if (network.getApiUrl() != null && network.getApiUrl().contains("pollinations")) {
-            return network;
-        }
-        NeuralNetwork fallback = new NeuralNetwork();
-        fallback.setName(network.getName());
-        fallback.setProvider("pollinations");
-        fallback.setNetworkType("image_generation");
-        fallback.setApiUrl("https://api.pollinations.ai/v1/images");
-        fallback.setModelName("pollinations-lite");
-        fallback.setRequestMapping(network.getRequestMapping());
-        fallback.setResponseMapping(network.getResponseMapping());
-        fallback.setApiKeyEncrypted(network.getApiKeyEncrypted());
-        return fallback;
-    }
-
     private static String buildTryOnPrompt(
         String basePrompt,
         String garmentBrand,
@@ -489,28 +431,6 @@ public class VirtualTryOnClient extends BaseNeuralClient {
             }
         }
         return null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, String>> extractOutputAsData(Map<String, Object> generated) {
-        List<Map<String, String>> data = new ArrayList<>();
-        Object output = generated.get("output");
-        if (output instanceof List<?> list) {
-            for (Object item : list) {
-                if (item instanceof Map<?, ?> map && map.get("url") instanceof String url && !url.isBlank()) {
-                    data.add(Map.of("url", url));
-                }
-            }
-        }
-        Object assets = generated.get("assets");
-        if (data.isEmpty() && assets instanceof List<?> assetList) {
-            for (Object item : assetList) {
-                if (item instanceof String url && !url.isBlank()) {
-                    data.add(Map.of("url", url));
-                }
-            }
-        }
-        return data;
     }
 
     private static String extractString(Map<String, Object> payload, String key) {

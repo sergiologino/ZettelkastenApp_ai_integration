@@ -59,7 +59,7 @@ jwt:
 encryption:
   secret-key: ${ENCRYPTION_SECRET_KEY:change-this-to-32-byte-secret-key-in-production!!!!!}
   
-# xAI (Grok Imagine try-on) — fallback if wibestyle-vton network has no API Key in admin UI
+# xAI (Grok Imagine try-on) - env key source if wibestyle-vton has no API Key in admin UI
 xai:
   api-key: ${XAI_API_KEY:}
 

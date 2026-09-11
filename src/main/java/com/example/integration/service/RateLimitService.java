@@ -110,6 +110,7 @@ public class RateLimitService {
             .findByTypeOrderedByPriority(networkType)
             .stream()
             .filter(n -> n.getIsFree() && n.getIsActive())
+            .filter(n -> !"pollinations".equalsIgnoreCase(n.getProvider()))
             .toList();
         
         for (NeuralNetwork network : freeNetworks) {
