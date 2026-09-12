@@ -51,6 +51,25 @@ class VirtualTryOnClientRoutingTest {
         );
     }
 
+    @Test
+    void declaredImagesAreTheCompleteInputList() {
+        Map<String, Object> payload = Map.of(
+            "prompt", "edit only hair",
+            "sourceImageBase64", "source-image",
+            "image4Base64", "must-not-be-added",
+            "images", List.of(
+                Map.of("label", "image1", "base64Field", "sourceImageBase64"),
+                Map.of("label", "image2", "base64", "style-image"),
+                Map.of("label", "image3", "base64", "color-image")
+            )
+        );
+
+        assertEquals(
+            List.of("source-image", "style-image", "color-image"),
+            XaiImagineEditClient.collectImageInputs(payload)
+        );
+    }
+
     private static String invokeResolveTryOnBackend(NeuralNetwork network) {
         Map<String, Object> map = network.getRequestMapping();
         Object backend = map.get("tryOnBackend");

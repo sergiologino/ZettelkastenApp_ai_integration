@@ -53,6 +53,9 @@ public class XaiImagineEditClient extends BaseNeuralClient {
         if (images.isEmpty()) {
             throw new IllegalArgumentException("Grok image edit requires at least one input image");
         }
+        if (images.size() > 3) {
+            throw new IllegalArgumentException("Grok image edit supports at most 3 input images; received " + images.size());
+        }
 
         String model = network.getModelName() != null && !network.getModelName().isBlank()
             ? network.getModelName()
@@ -161,6 +164,9 @@ public class XaiImagineEditClient extends BaseNeuralClient {
         if (declaredImages instanceof List<?> list) {
             for (Object item : list) {
                 addDeclaredImage(images, payload, item);
+            }
+            if (!images.isEmpty()) {
+                return List.copyOf(images);
             }
         }
         for (int i = 1; i <= 10; i++) {
