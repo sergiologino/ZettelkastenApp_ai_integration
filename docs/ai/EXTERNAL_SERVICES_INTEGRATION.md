@@ -244,6 +244,33 @@ GET {BASE_URL}/actuator/health
 
 Ответ: `imageBase64` (фото) или `videoBase64` (видео), плюс `tokensUsed` / `creditsUsed`.
 
+### 7.5.1. Generic image edit на Grok-backed image networks
+
+AI Integration Service также поддерживает generic image edit для сценариев, которые **не являются одежной примеркой** и не должны подчиняться схеме `person + garment`. Если сеть использует Grok Imagine edit (`wibestyle-vton` / `tryOnBackend=grok-imagine-edit`), а в payload нет `garmentImageBase64`, но есть явный список `images[]`, сервис передаёт изображения в нейросеть в порядке клиента и не требует `personImageBase64 + garmentImageBase64`.
+
+Минимальный payload:
+
+```json
+{
+  "prompt": "Edit only hair pixels...",
+  "sourceImageBase64": "<BASE64>",
+  "portraitImageBase64": "<BASE64>",
+  "hairstyleReferenceImageBase64": "<BASE64>",
+  "images": [
+    { "label": "image1", "base64Field": "sourceImageBase64", "role": "final source image" },
+    { "label": "image2", "base64Field": "portraitImageBase64", "role": "identity reference" },
+    { "label": "image3", "base64Field": "hairstyleReferenceImageBase64", "role": "style reference" }
+  ]
+}
+```
+
+Правила:
+
+- `images[].base64Field` указывает на top-level поле payload с base64/data URI/URL изображения.
+- Вместо `base64Field` можно передать `base64` или `url` прямо внутри элемента `images[]`.
+- Сервис не анализирует роли и не контролирует структуру промта; роли нужны вызывающему приложению и самой нейросети.
+- Если передан `garmentImageBase64`, запрос трактуется как одежный virtual try-on и применяются правила §7.5.
+
 ### 7.6. Прочие типы
 
 `embedding`, `image_generation`, `video_generation` — смотрите соответствующий `*Client.java` и настройки сети в админке (`apiUrl`, `modelName`, маппинги).

@@ -7,6 +7,7 @@ import com.example.integration.support.RemoteImageDownloader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,6 +46,39 @@ public class XaiImagineEditClient extends BaseNeuralClient {
     @Override
     public Map<String, Object> sendRequest(NeuralNetwork network, Map<String, Object> payload) throws Exception {
         throw new UnsupportedOperationException("Use editVirtualTryOn() for multi-image try-on");
+    }
+
+    public Map<String, Object> editImages(NeuralNetwork network, Map<String, Object> payload, String editPrompt) throws Exception {
+        List<String> images = collectImageInputs(payload);
+        if (images.isEmpty()) {
+            throw new IllegalArgumentException("Grok image edit requires at least one input image");
+        }
+
+        String model = network.getModelName() != null && !network.getModelName().isBlank()
+            ? network.getModelName()
+            : DEFAULT_MODEL;
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", model);
+        body.put("prompt", editPrompt);
+        body.put("aspect_ratio", stringValue(payload.get("aspectRatio"), stringValue(extractSettings(payload).get("aspectRatio"), "3:4")));
+        body.put("response_format", "url");
+        body.put("n", 1);
+        body.put("images", images.stream().map(XaiImagineEditClient::imageRef).toList());
+
+        HttpHeaders headers = prepareHeaders(network);
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        String endpoint = resolveEditEndpoint(network);
+        log.info("Grok Imagine generic image edit: POST {} model={} images={} promptLen={}", endpoint, model, images.size(), editPrompt.length());
+
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+            endpoint,
+            Objects.requireNonNull(HttpMethod.POST),
+            requestEntity,
+            new ParameterizedTypeReference<>() {}
+        );
+
+        return normalizeEditResponse(editPrompt, body, response.getBody());
     }
 
     public Map<String, Object> editVirtualTryOn(NeuralNetwork network, Map<String, Object> payload, String editPrompt) throws Exception {
@@ -105,17 +139,84 @@ public class XaiImagineEditClient extends BaseNeuralClient {
 
     private static Map<String, Object> imageRef(String base64) {
         return Map.of(
-            "url", toDataUri(base64),
+            "url", toImageUrl(base64),
             "type", "image_url"
         );
     }
 
-    private static String toDataUri(String base64) {
-        String trimmed = base64.trim();
-        if (trimmed.startsWith("data:image/")) {
+    private static String toImageUrl(String base64OrUrl) {
+        String trimmed = base64OrUrl.trim();
+        if (trimmed.startsWith("data:image/") || trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
             return trimmed;
         }
         return "data:image/jpeg;base64," + trimmed;
+    }
+
+    static List<String> collectImageInputs(Map<String, Object> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<String> images = new LinkedHashSet<>();
+        Object declaredImages = payload.get("images");
+        if (declaredImages instanceof List<?> list) {
+            for (Object item : list) {
+                addDeclaredImage(images, payload, item);
+            }
+        }
+        for (int i = 1; i <= 10; i++) {
+            addStringValue(images, payload.get("image" + i + "Base64"));
+        }
+        addStringValue(images, payload.get("imageBase64"));
+        addStringValue(images, payload.get("sourceImageBase64"));
+        addStringValue(images, payload.get("personImageBase64"));
+        addStringValue(images, payload.get("garmentImageBase64"));
+        return List.copyOf(images);
+    }
+
+    private static void addDeclaredImage(LinkedHashSet<String> images, Map<String, Object> payload, Object item) {
+        if (item instanceof String str) {
+            addStringValue(images, str);
+            return;
+        }
+        if (!(item instanceof Map<?, ?> map)) {
+            return;
+        }
+        addStringValue(images, map.get("base64"));
+        addStringValue(images, map.get("url"));
+        Object base64Field = map.get("base64Field");
+        if (base64Field instanceof String field && !field.isBlank()) {
+            addStringValue(images, payload.get(field));
+        }
+        Object field = map.get("field");
+        if (field instanceof String fieldName && !fieldName.isBlank()) {
+            addStringValue(images, payload.get(fieldName));
+        }
+    }
+
+    private static void addStringValue(LinkedHashSet<String> images, Object value) {
+        if (value instanceof String str && !str.isBlank()) {
+            images.add(str.trim());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> extractSettings(Map<String, Object> payload) {
+        Object settings = payload == null ? null : payload.get("settings");
+        if (settings instanceof Map<?, ?> map) {
+            Map<String, Object> result = new HashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                result.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+            return result;
+        }
+        return Map.of();
+    }
+
+    private static String stringValue(Object value, String fallback) {
+        if (value instanceof String str && !str.isBlank()) {
+            return str;
+        }
+        return fallback;
     }
 
     private Map<String, Object> normalizeEditResponse(String prompt, Map<String, Object> request, Map<String, Object> raw) {

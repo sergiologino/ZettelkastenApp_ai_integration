@@ -95,6 +95,9 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         if (tryOnBackend.startsWith("kling")) {
             return delegateTryOn(klingVirtualTryOnClient, network, payload, "virtual_try_on_kling", tryOnBackend);
         }
+        if (garmentImage == null && isGenericImageEditPayload(payload)) {
+            return runGenericGrokImageEdit(network, payload, basePrompt, keySource);
+        }
 
         String skipGrokReason = grokSkipReason(network, personImage, garmentImage);
         if (skipGrokReason == null) {
@@ -193,6 +196,32 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         throw new IllegalStateException("Virtual try-on requires Grok Imagine or dedicated FASHN/Kling backend: " + skipGrokReason);
     }
 
+    private Map<String, Object> runGenericGrokImageEdit(
+        NeuralNetwork network,
+        Map<String, Object> payload,
+        String prompt,
+        String keySource
+    ) throws Exception {
+        if (!isGrokBackend(network) && !apiUrlPointsToXai(network)) {
+            throw new IllegalStateException("Generic image edit requires Grok Imagine backend");
+        }
+        if (!hasConfiguredApiKey(network)) {
+            throw new IllegalStateException("Generic image edit requires xAI API key");
+        }
+        try {
+            xaiApiKeyResolver.resolve(network).ifPresent(BaseNeuralClient::setUserApiKey);
+            Map<String, Object> generated = xaiImagineEditClient.editImages(network, payload, prompt.trim());
+            Map<String, Object> result = new HashMap<>(generated);
+            result.put("provider", "grok_image_edit");
+            result.put("tryOnRoute", "grok_imagine_generic_edit");
+            result.put("xaiKeySource", keySource);
+            result.put("prompt", prompt.trim());
+            return result;
+        } finally {
+            BaseNeuralClient.clearUserApiKey();
+        }
+    }
+
     /** null = Grok should run; otherwise human-readable skip reason. */
     private String grokSkipReason(NeuralNetwork network, String personImage, String garmentImage) {
         if (personImage == null || garmentImage == null) {
@@ -241,6 +270,10 @@ public class VirtualTryOnClient extends BaseNeuralClient {
         }
         Object backend = map.get("tryOnBackend");
         return backend != null ? backend.toString().toLowerCase() : "grok-imagine-edit";
+    }
+
+    static boolean isGenericImageEditPayload(Map<String, Object> payload) {
+        return !XaiImagineEditClient.collectImageInputs(payload).isEmpty();
     }
 
     private boolean isGrokBackend(NeuralNetwork network) {

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.integration.model.NeuralNetwork;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,27 @@ class VirtualTryOnClientRoutingTest {
         String backend = invokeResolveTryOnBackend(network);
         assertEquals("kling-kolors-tryon", backend);
         assertTrue(backend.startsWith("kling"));
+    }
+
+    @Test
+    void genericImageEditPayloadUsesDeclaredImagesWithoutGarmentContract() {
+        Map<String, Object> payload = Map.of(
+            "prompt", "edit only hair",
+            "sourceImageBase64", "source-image",
+            "portraitImageBase64", "portrait-image",
+            "hairstyleReferenceImageBase64", "style-image",
+            "images", List.of(
+                Map.of("label", "image1", "base64Field", "sourceImageBase64"),
+                Map.of("label", "image2", "base64Field", "portraitImageBase64"),
+                Map.of("label", "image3", "base64Field", "hairstyleReferenceImageBase64")
+            )
+        );
+
+        assertTrue(VirtualTryOnClient.isGenericImageEditPayload(payload));
+        assertEquals(
+            List.of("source-image", "portrait-image", "style-image"),
+            XaiImagineEditClient.collectImageInputs(payload)
+        );
     }
 
     private static String invokeResolveTryOnBackend(NeuralNetwork network) {
